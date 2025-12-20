@@ -33,7 +33,7 @@ describe('approveLeaveRequest', () => {
 
     await approveLeaveRequest(
       { leaveRequestRepository },
-      { request, team: baseTeam, actorUid: 'lead-1' },
+      { request, team: baseTeam, actorUid: 'lead-1', actorRole: 'team_lead' },
     )
 
     expect(approveAsTeamLead).toHaveBeenCalledWith({
@@ -56,6 +56,7 @@ describe('approveLeaveRequest', () => {
         request,
         team: { ...baseTeam, managerUid: null },
         actorUid: 'lead-1',
+        actorRole: 'team_lead',
       },
     )
 
@@ -79,6 +80,7 @@ describe('approveLeaveRequest', () => {
         request: { ...request, status: 'TL_APPROVED' },
         team: baseTeam,
         actorUid: 'manager-1',
+        actorRole: 'manager',
       },
     )
 
@@ -102,6 +104,7 @@ describe('approveLeaveRequest', () => {
         request: { ...request, employeeUid: 'lead-1' },
         team: baseTeam,
         actorUid: 'manager-1',
+        actorRole: 'manager',
       },
     )
 
@@ -125,8 +128,33 @@ describe('approveLeaveRequest', () => {
           request: { ...request, employeeUid: 'lead-1' },
           team: baseTeam,
           actorUid: 'lead-1',
+          actorRole: 'team_lead',
         },
       ),
     ).rejects.toThrow('Team lead cannot approve their own request.')
+  })
+
+  it('allows admin to approve submitted requests directly', async () => {
+    const approveAsManager = vi.fn().mockResolvedValue(undefined)
+    const leaveRequestRepository = {
+      approveAsTeamLead: vi.fn(),
+      approveAsManager,
+    }
+
+    await approveLeaveRequest(
+      { leaveRequestRepository },
+      {
+        request,
+        team: null,
+        actorUid: 'admin-1',
+        actorRole: 'admin',
+      },
+    )
+
+    expect(approveAsManager).toHaveBeenCalledWith({
+      requestId: 'req-1',
+      actorUid: 'admin-1',
+      direct: true,
+    })
   })
 })

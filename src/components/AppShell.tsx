@@ -18,7 +18,7 @@ export function AppShell() {
   const isAdmin = role === 'admin'
   const isTeamLead = Boolean(team && user && team.leadUid === user.uid)
   const isManager = Boolean(team && user && team.managerUid === user.uid)
-  const canSeeApprovals = isTeamLead || isManager
+  const canSeeApprovals = isAdmin || isTeamLead || isManager
   const roleClassName =
     role === 'admin'
       ? 'bg-amber-100 text-amber-800'

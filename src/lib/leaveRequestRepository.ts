@@ -70,6 +70,10 @@ export type LeaveRequestRepository = {
     onData: (requests: LeaveRequest[]) => void,
     onError?: (error: Error) => void,
   ) => () => void
+  subscribeAllRequests: (
+    onData: (requests: LeaveRequest[]) => void,
+    onError?: (error: Error) => void,
+  ) => () => void
   subscribeApprovedRequests: (
     onData: (requests: LeaveRequest[]) => void,
     onError?: (error: Error) => void,
@@ -363,6 +367,21 @@ export function createLeaveRequestRepository(db: Firestore): LeaveRequestReposit
 
       return onSnapshot(
         requestQuery,
+        (snapshot) => {
+          const requests = snapshot.docs.map((docSnapshot) =>
+            buildLeaveRequest(docSnapshot.data(), docSnapshot.id),
+          )
+          requests.sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
+          onData(requests)
+        },
+        (error) => {
+          onError?.(error instanceof Error ? error : new Error('Failed to load requests'))
+        },
+      )
+    },
+    subscribeAllRequests: (onData, onError) => {
+      return onSnapshot(
+        collection(db, 'leaveRequests'),
         (snapshot) => {
           const requests = snapshot.docs.map((docSnapshot) =>
             buildLeaveRequest(docSnapshot.data(), docSnapshot.id),

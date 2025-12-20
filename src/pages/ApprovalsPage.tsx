@@ -8,12 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTeamRequests } from '@/hooks/useTeamRequests'
 import { useTeam } from '@/hooks/useTeam'
 import { useUserProfile } from '@/hooks/useUserProfile'
+import { useAllRequests } from '@/hooks/useAllRequests'
 import { useUsersList } from '@/hooks/useUsersList'
+import { useTeamsList } from '@/hooks/useTeamsList'
 import { useToast } from '@/hooks/useToast'
 import { formatDateTime, formatDuration } from '@/lib/leave'
 import { useRepositories } from '@/lib/useRepositories'
 import type { LeaveRequest } from '@/types/leave'
 import { approveLeaveRequest } from '@/usecases/approveLeaveRequest'
+import { cancelLeaveRequest } from '@/usecases/cancelLeaveRequest'
 import { rejectLeaveRequest } from '@/usecases/rejectLeaveRequest'
 
 const statusLabels: Record<string, string> = {
@@ -28,7 +31,17 @@ function getUserLabel(usersById: Map<string, string>, uid: string) {
   return usersById.get(uid) ?? uid
 }
 
-function canApprove(request: LeaveRequest, actorUid: string, teamLeadUid: string | null, managerUid: string | null) {
+function canApprove(
+  request: LeaveRequest,
+  actorUid: string,
+  teamLeadUid: string | null,
+  managerUid: string | null,
+  isAdmin: boolean,
+) {
+  if (isAdmin) {
+    return request.status === 'SUBMITTED' || request.status === 'TL_APPROVED'
+  }
+
   if (teamLeadUid === actorUid && request.status === 'SUBMITTED') {
     return request.employeeUid !== teamLeadUid
   }
@@ -46,7 +59,17 @@ function canApprove(request: LeaveRequest, actorUid: string, teamLeadUid: string
   return false
 }
 
-function canReject(request: LeaveRequest, actorUid: string, teamLeadUid: string | null, managerUid: string | null) {
+function canReject(
+  request: LeaveRequest,
+  actorUid: string,
+  teamLeadUid: string | null,
+  managerUid: string | null,
+  isAdmin: boolean,
+) {
+  if (isAdmin) {
+    return false
+  }
+
   if (teamLeadUid === actorUid && request.status === 'SUBMITTED') {
     return request.employeeUid !== teamLeadUid
   }
@@ -67,9 +90,13 @@ function canReject(request: LeaveRequest, actorUid: string, teamLeadUid: string 
 export function ApprovalsPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { team } = useTeam(profile?.teamId ?? null)
-  const { requests, loading, error } = useTeamRequests(profile?.teamId ?? null)
+  const isAdmin = profile?.role === 'admin'
+  const { team } = useTeam(isAdmin ? null : profile?.teamId ?? null)
+  const teamRequests = useTeamRequests(profile?.teamId ?? null)
+  const allRequests = useAllRequests(isAdmin)
+  const { requests, loading, error } = isAdmin ? allRequests : teamRequests
   const { users } = useUsersList()
+  const { teams } = useTeamsList()
   const { leaveRequestRepository } = useRepositories()
   const toast = useToast()
   const [reasonByRequest, setReasonByRequest] = useState<Record<string, string>>({})
@@ -79,8 +106,23 @@ export function ApprovalsPage() {
     return new Map(users.map((userProfile) => [userProfile.uid, userProfile.displayName]))
   }, [users])
 
+  const teamsById = useMemo(() => {
+    return new Map(teams.map((teamItem) => [teamItem.id, teamItem]))
+  }, [teams])
+
   const pendingRequests = useMemo(() => {
-    if (!user || !team) {
+    if (!user) {
+      return []
+    }
+
+    if (isAdmin) {
+      return requests.filter(
+        (request) =>
+          request.status === 'SUBMITTED' || request.status === 'TL_APPROVED',
+      )
+    }
+
+    if (!team) {
       return []
     }
 
@@ -112,7 +154,7 @@ export function ApprovalsPage() {
   }, [pendingRequests, requests])
 
   const handleApprove = async (request: LeaveRequest) => {
-    if (!user || !team || !leaveRequestRepository) {
+    if (!user || !leaveRequestRepository) {
       return
     }
 
@@ -121,7 +163,12 @@ export function ApprovalsPage() {
     try {
       await approveLeaveRequest(
         { leaveRequestRepository },
-        { request, team, actorUid: user.uid },
+        {
+          request,
+          team: isAdmin ? null : team,
+          actorUid: user.uid,
+          actorRole: profile?.role ?? 'employee',
+        },
       )
       toast.push({ title: 'Request approved', description: 'Status updated.' })
     } catch (caught) {
@@ -156,6 +203,31 @@ export function ApprovalsPage() {
     }
   }
 
+  const handleCancel = async (request: LeaveRequest) => {
+    if (!user || !leaveRequestRepository) {
+      return
+    }
+
+    if (!isAdmin) {
+      return
+    }
+
+    setActingId(request.id)
+
+    try {
+      await cancelLeaveRequest(
+        { leaveRequestRepository },
+        { request, actorUid: user.uid, actorRole: 'admin', reason: 'Cancelled by admin' },
+      )
+      toast.push({ title: 'Request cancelled', description: 'Status updated.' })
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Unable to cancel.'
+      toast.push({ title: 'Cancellation blocked', description: message })
+    } finally {
+      setActingId(null)
+    }
+  }
+
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading approvals...</p>
   }
@@ -164,7 +236,7 @@ export function ApprovalsPage() {
     return <p className="text-sm text-destructive">Failed to load approvals.</p>
   }
 
-  if (!team || !user) {
+  if (!user || (!team && !isAdmin)) {
     return (
       <section className="space-y-2">
         <h1 className="text-2xl font-semibold">Approvals</h1>
@@ -173,9 +245,9 @@ export function ApprovalsPage() {
     )
   }
 
-  const teamLeadUid = team.leadUid
-  const managerUid = team.managerUid
-  const isApprover = teamLeadUid === user.uid || managerUid === user.uid
+  const teamLeadUid = team?.leadUid ?? null
+  const managerUid = team?.managerUid ?? null
+  const isApprover = isAdmin || teamLeadUid === user.uid || managerUid === user.uid
 
   if (!isApprover) {
     return (
@@ -210,6 +282,11 @@ export function ApprovalsPage() {
                 <div key={request.id} className="rounded-lg border p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
+                      {isAdmin ? (
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Team: {teamsById.get(request.teamId)?.name ?? request.teamId}
+                        </div>
+                      ) : null}
                       <div className="text-sm text-muted-foreground">
                         {getUserLabel(usersById, request.employeeUid)}
                       </div>
@@ -239,13 +316,19 @@ export function ApprovalsPage() {
                     <Button
                       variant="secondary"
                       onClick={() => handleReject(request)}
-                      disabled={actingId === request.id || !canReject(request, user.uid, teamLeadUid, managerUid)}
+                      disabled={
+                        actingId === request.id ||
+                        !canReject(request, user.uid, teamLeadUid, managerUid, isAdmin)
+                      }
                     >
                       Reject
                     </Button>
                     <Button
                       onClick={() => handleApprove(request)}
-                      disabled={actingId === request.id || !canApprove(request, user.uid, teamLeadUid, managerUid)}
+                      disabled={
+                        actingId === request.id ||
+                        !canApprove(request, user.uid, teamLeadUid, managerUid, isAdmin)
+                      }
                     >
                       Approve
                     </Button>
@@ -264,6 +347,11 @@ export function ApprovalsPage() {
                 <div key={request.id} className="rounded-lg border p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
+                      {isAdmin ? (
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Team: {teamsById.get(request.teamId)?.name ?? request.teamId}
+                        </div>
+                      ) : null}
                       <div className="text-sm text-muted-foreground">
                         {getUserLabel(usersById, request.employeeUid)}
                       </div>
@@ -279,6 +367,28 @@ export function ApprovalsPage() {
                       {statusLabels[request.status] ?? request.status}
                     </Badge>
                   </div>
+                  {isAdmin && request.status === 'APPROVED' ? (
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleCancel(request)}
+                        disabled={actingId === request.id}
+                      >
+                        Cancel approved request
+                      </Button>
+                    </div>
+                  ) : null}
+                  {(request.step1 || request.step2) && (
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      {request.step1
+                        ? `Step 1: ${getUserLabel(usersById, request.step1.byUid)} · ${formatDateTime(request.step1.at)}`
+                        : 'Step 1: —'}
+                      {' · '}
+                      {request.step2
+                        ? `Final: ${getUserLabel(usersById, request.step2.byUid)} · ${formatDateTime(request.step2.at)}`
+                        : 'Final: —'}
+                    </div>
+                  )}
                 </div>
               ))
             )}

@@ -22,6 +22,8 @@ import {
 import { useLeaveLogs } from '@/hooks/useLeaveLogs'
 import { useLeaveRequests } from '@/hooks/useLeaveRequests'
 import { useToast } from '@/hooks/useToast'
+import { useUsersList } from '@/hooks/useUsersList'
+import { useUserProfile } from '@/hooks/useUserProfile'
 import { formatDateTime, formatDuration } from '@/lib/leave'
 import { useRepositories } from '@/lib/useRepositories'
 import type { LeaveRequest } from '@/types/leave'
@@ -39,12 +41,17 @@ export function MyRequestsPage() {
   const { user } = useAuth()
   const { leaveRequestRepository } = useRepositories()
   const toast = useToast()
+  const { profile } = useUserProfile()
   const { requests, loading, error } = useLeaveRequests(user?.uid ?? null)
   const [selected, setSelected] = useState<LeaveRequest | null>(null)
   const { logs } = useLeaveLogs(selected?.id ?? null)
+  const { users } = useUsersList()
   const [cancelling, setCancelling] = useState(false)
 
   const sortedRequests = useMemo(() => requests, [requests])
+  const userLabelById = useMemo(() => {
+    return new Map(users.map((profile) => [profile.uid, profile.displayName]))
+  }, [users])
 
   const handleCancel = async (request: LeaveRequest) => {
     if (!user || !leaveRequestRepository) {
@@ -55,16 +62,27 @@ export function MyRequestsPage() {
     try {
       await cancelLeaveRequest(
         { leaveRequestRepository },
-        { requestId: request.id, actorUid: user.uid, reason: null },
+        {
+          request,
+          actorUid: user.uid,
+          actorRole: profile?.role ?? 'employee',
+          reason: null,
+        },
       )
       toast.push({
         title: 'Request cancelled',
         description: 'The leave request has been cancelled.',
       })
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : 'Unable to cancel request.'
+      toast.push({ title: 'Cancellation blocked', description: message })
     } finally {
       setCancelling(false)
     }
   }
+
+  const getUserLabel = (uid: string) => userLabelById.get(uid) ?? uid
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading requests...</p>
@@ -142,19 +160,19 @@ export function MyRequestsPage() {
                 <div>
                   Step 1:{' '}
                   {selected.step1
-                    ? `${selected.step1.byUid} · ${formatDateTime(selected.step1.at)}`
+                    ? `${getUserLabel(selected.step1.byUid)} · ${formatDateTime(selected.step1.at)}`
                     : '—'}
                 </div>
                 <div>
                   Step 2:{' '}
                   {selected.step2
-                    ? `${selected.step2.byUid} · ${formatDateTime(selected.step2.at)}`
+                    ? `${getUserLabel(selected.step2.byUid)} · ${formatDateTime(selected.step2.at)}`
                     : '—'}
                 </div>
                 <div>
                   Rejection:{' '}
                   {selected.rejection
-                    ? `${selected.rejection.byUid} · ${formatDateTime(selected.rejection.at)}`
+                    ? `${getUserLabel(selected.rejection.byUid)} · ${formatDateTime(selected.rejection.at)}`
                     : '—'}
                 </div>
                 {selected.rejection?.reason ? (
@@ -176,7 +194,7 @@ export function MyRequestsPage() {
 
                       return (
                         <li key={log.id}>
-                          {log.action} · {formatDateTime(log.at)}
+                          {log.action} · {getUserLabel(log.actorUid)} · {formatDateTime(log.at)}
                           {reason ? ` · ${reason}` : ''}
                         </li>
                       )
@@ -185,7 +203,8 @@ export function MyRequestsPage() {
                 </ul>
               </div>
               <DialogFooter>
-                {selected.status !== 'CANCELLED' ? (
+                {selected.status === 'SUBMITTED' ||
+                selected.status === 'TL_APPROVED' ? (
                   <Button
                     variant="secondary"
                     onClick={() => handleCancel(selected)}
