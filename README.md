@@ -7,15 +7,17 @@ Internal, trust-based leave request tool built with React + TypeScript + Vite an
 - Google-only Firebase Auth with whitelist gate
 - Teams with team lead + manager approvals (two-step flow)
 - Leave requests with overlap checks and audit logs
-- Home calendar with week/month views of approved leave
-- Admin dashboard for users, teams, and roles
+- Working-day calculations (Sun–Thu) and minute-based durations
+- Home calendar with week/month/year views of approved leave
+- Leave balances per year with admin adjustments and carryover support
+- Admin dashboard for users, teams, roles, and balance audits
 
 ## Roles
 
 - Admin: manages users/teams, sees all approved leave in the calendar
 - Team lead: approves step 1 (except own requests)
 - Manager: approves final step
-- Employee: creates and views own leave
+- Employee: creates and views own leave and balance adjustments
 
 ## Tech stack
 
@@ -46,12 +48,24 @@ Internal, trust-based leave request tool built with React + TypeScript + Vite an
    npm run dev
    ```
 
+## Firestore rules
+
+The project includes `firestore.rules` with lightweight access control based on whitelist, role, and team.
+To apply:
+
+```bash
+firebase login
+firebase use <project-id>
+firebase deploy --only firestore:rules
+```
+
 ## Scripts
 
 - `npm run dev` – start Vite dev server
 - `npm run lint` – run ESLint
 - `npm run build` – type-check and build
 - `npm run preview` – preview the production build
+- `npm run test` – run Vitest
 
 ## Notes
 
