@@ -1,6 +1,8 @@
 import type { LeaveRequest } from '@/types/leave'
 
 const DAY_MS = 24 * 60 * 60 * 1000
+const DEFAULT_DAILY_MINUTES = 480
+const DEFAULT_WORKING_DAYS = [0, 1, 2, 3, 4] as const
 
 export function computeMinutes(start: Date, end: Date) {
   const diffMs = end.getTime() - start.getTime()
@@ -18,7 +20,7 @@ export function startOfTomorrow(date: Date = new Date()) {
 export function startOfWeek(date: Date = new Date()) {
   const start = startOfDay(date)
   const day = start.getDay()
-  const diff = (day + 6) % 7
+  const diff = day
   return addDays(start, -diff)
 }
 
@@ -42,12 +44,82 @@ export function formatDuration(minutes: number) {
   return `${remainder}m`
 }
 
+export function formatDurationWithDays(
+  minutes: number,
+  dailyMinutes = DEFAULT_DAILY_MINUTES,
+) {
+  const safeMinutes = Math.max(0, minutes)
+  if (dailyMinutes <= 0) {
+    return formatDuration(safeMinutes)
+  }
+
+  const days = Math.floor(safeMinutes / dailyMinutes)
+  const remainder = safeMinutes % dailyMinutes
+
+  if (days > 0 && remainder === 0) {
+    return days === 1 ? '1d' : `${days}d`
+  }
+
+  if (days > 0) {
+    return `${days}d ${formatDuration(remainder)}`
+  }
+
+  return formatDuration(remainder)
+}
+
 export function formatDateTime(value: Date) {
   return value.toLocaleString()
 }
 
 export function overlaps(startA: Date, endA: Date, startB: Date, endB: Date) {
   return startA < endB && startB < endA
+}
+
+export function computeWorkingMinutes(
+  start: Date,
+  end: Date,
+  options?: {
+    workingDays?: readonly number[]
+    dailyMinutes?: number
+  },
+) {
+  if (end <= start) {
+    return 0
+  }
+
+  const workingDays = options?.workingDays ?? DEFAULT_WORKING_DAYS
+  const dailyMinutes = options?.dailyMinutes ?? DEFAULT_DAILY_MINUTES
+  const startDay = startOfDay(start)
+  const endDay = startOfDay(end)
+  let total = 0
+  let cursor = startDay
+
+  while (cursor <= endDay) {
+    const dayIndex = cursor.getDay()
+    const isWorking = workingDays.includes(dayIndex)
+    if (isWorking) {
+      if (isSameDay(cursor, startDay) && isSameDay(cursor, endDay)) {
+        const minutes = computeMinutes(start, end)
+        total += Math.min(dailyMinutes, Math.max(0, minutes))
+      } else if (isSameDay(cursor, startDay)) {
+        const minutes = computeMinutes(start, addDays(cursor, 1))
+        total += Math.min(dailyMinutes, Math.max(0, minutes))
+      } else if (isSameDay(cursor, endDay)) {
+        const minutes = computeMinutes(cursor, end)
+        total += Math.min(dailyMinutes, Math.max(0, minutes))
+      } else {
+        total += dailyMinutes
+      }
+    }
+
+    cursor = addDays(cursor, 1)
+  }
+
+  return total
+}
+
+export function isWorkingDay(date: Date, workingDays: readonly number[] = DEFAULT_WORKING_DAYS) {
+  return workingDays.includes(date.getDay())
 }
 
 export function hasOverlap(

@@ -10,13 +10,13 @@ import {
 } from '@/lib/calendar'
 
 describe('calendar helpers', () => {
-  it('builds week days starting on Monday', () => {
+  it('builds week days starting on Sunday', () => {
     const base = new Date(2024, 0, 17, 10, 0, 0, 0)
     const days = getWeekDays(base)
 
     expect(days).toHaveLength(7)
-    expect(days[0]).toEqual(new Date(2024, 0, 15))
-    expect(days[6]).toEqual(new Date(2024, 0, 21))
+    expect(days[0]).toEqual(new Date(2024, 0, 14))
+    expect(days[6]).toEqual(new Date(2024, 0, 20))
   })
 
   it('builds month weeks covering full month', () => {

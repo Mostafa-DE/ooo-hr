@@ -35,7 +35,7 @@ We accept controlled risk in exchange for simplicity and speed.
 
 Agents **must not**:
 
-- Add HR features (balances, accruals, policies)
+- Add HR features (accruals or policy engines beyond leave balances)
 - Add attendance or time tracking
 - Expand approval flows beyond Team Lead → Manager
 - Introduce CEO approval logic
@@ -44,6 +44,9 @@ Agents **must not**:
 - Introduce backend services or server APIs
 
 ooo is intentionally limited.
+
+Allowed exception:
+- Leave balances with yearly tracking and admin adjustments are permitted.
 
 ---
 

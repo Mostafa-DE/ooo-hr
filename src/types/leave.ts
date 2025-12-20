@@ -25,7 +25,9 @@ export type LeaveRequest = {
   type: LeaveType
   startAt: Date
   endAt: Date
+  year?: number
   requestedMinutes: number
+  durationMinutes?: number
   status: LeaveStatus
   note: string | null
   step1?: LeaveApprovalStep | null

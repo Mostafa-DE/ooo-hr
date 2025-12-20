@@ -1,14 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/auth/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useLeaveBalances } from '@/hooks/useLeaveBalances'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import { useTeam } from '@/hooks/useTeam'
 import { useToast } from '@/hooks/useToast'
-import { computeMinutes, formatDuration } from '@/lib/leave'
+import { computeWorkingMinutes, formatDurationWithDays, isWorkingDay } from '@/lib/leave'
 import { useRepositories } from '@/lib/useRepositories'
 import type { LeaveType } from '@/types/leave'
 import { createLeaveRequest } from '@/usecases/createLeaveRequest'
@@ -20,47 +21,132 @@ export function RequestLeavePage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { team } = useTeam(profile?.teamId ?? null)
-  const { leaveRequestRepository } = useRepositories()
+  const { leaveRequestRepository, leaveBalanceRepository } = useRepositories()
   const toast = useToast()
+  const { balances } = useLeaveBalances(user?.uid ?? null)
 
   const [type, setType] = useState<LeaveType>('annual')
-  const [startAt, setStartAt] = useState('')
-  const [endAt, setEndAt] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [startTime, setStartTime] = useState('09:00')
+  const [endDate, setEndDate] = useState('')
+  const [endTime, setEndTime] = useState('17:00')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const currentYear = new Date().getFullYear()
+
+  const balancesByType = useMemo(() => {
+    const map = new Map<LeaveType, number>()
+    balances
+      .filter((balance) => balance.year === currentYear)
+      .forEach((balance) => {
+        map.set(balance.leaveTypeId as LeaveType, balance.balanceMinutes)
+      })
+    return map
+  }, [balances, currentYear])
+
+  const toLocalDateValue = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const workingDates = useMemo(() => {
+    const dates: { value: string; label: string }[] = []
+    const today = new Date()
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    for (let offset = 0; offset <= 120; offset += 1) {
+      const candidate = new Date(start.getFullYear(), start.getMonth(), start.getDate() + offset)
+      if (isWorkingDay(candidate)) {
+        const value = toLocalDateValue(candidate)
+        const label = candidate.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+        dates.push({ value, label })
+      }
+    }
+    return dates
+  }, [])
+
+  const endDateOptions = useMemo(() => {
+    if (!startDate) {
+      return workingDates
+    }
+    return workingDates.filter((date) => date.value >= startDate)
+  }, [startDate, workingDates])
+
+  const isMultiDay = Boolean(startDate && endDate && endDate !== startDate)
+
+  useEffect(() => {
+    if (isMultiDay) {
+      setStartTime('09:00')
+      setEndTime('17:00')
+    }
+  }, [isMultiDay])
+
+  const buildDateTime = (dateValue: string, timeValue: string) => {
+    if (!dateValue || !timeValue) {
+      return null
+    }
+    const combined = new Date(`${dateValue}T${timeValue}`)
+    return Number.isNaN(combined.getTime()) ? null : combined
+  }
+
   const preview = useMemo(() => {
-    if (!startAt || !endAt) {
+    const start = buildDateTime(startDate, startTime)
+    const end = buildDateTime(endDate, endTime)
+    if (!start || !end) {
       return null
     }
 
-    const start = new Date(startAt)
-    const end = new Date(endAt)
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return null
-    }
-
-    const minutes = computeMinutes(start, end)
+    const minutes = computeWorkingMinutes(start, end)
     if (minutes <= 0) {
       return null
     }
 
-    return formatDuration(minutes)
-  }, [startAt, endAt])
+    return formatDurationWithDays(minutes)
+  }, [endDate, endTime, startDate, startTime])
+
+  const formatBalance = (minutes: number | undefined) => {
+    if (minutes === undefined) {
+      return '—'
+    }
+    const hours = Math.floor(minutes / 60)
+    const remainder = minutes % 60
+    const days = Math.floor(minutes / 480)
+    const parts = []
+    if (days > 0) {
+      parts.push(`${days}d`)
+    }
+    if (hours > 0 || remainder > 0) {
+      parts.push(remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`)
+    }
+    return parts.length > 0 ? parts.join(' · ') : '0m'
+  }
 
   const handleSubmit = async () => {
-    if (!user || !profile || !profile.teamId || !leaveRequestRepository || !team) {
+    if (
+      !user ||
+      !profile ||
+      !profile.teamId ||
+      !leaveRequestRepository ||
+      !leaveBalanceRepository ||
+      !team
+    ) {
       return
     }
 
     setError(null)
 
-    const start = new Date(startAt)
-    const end = new Date(endAt)
+    const start = buildDateTime(startDate, startTime)
+    const end = buildDateTime(endDate, endTime)
 
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    if (!start || !end) {
       setError('Please provide valid start and end times.')
       return
     }
@@ -69,7 +155,7 @@ export function RequestLeavePage() {
 
     try {
       await createLeaveRequest(
-        { leaveRequestRepository },
+        { leaveRequestRepository, leaveBalanceRepository },
         {
           employeeUid: user.uid,
           teamId: profile.teamId,
@@ -113,8 +199,26 @@ export function RequestLeavePage() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Request Leave</h1>
         <p className="text-muted-foreground">
-          Submit a new leave request for your team.
+          Submit a new leave request for your team (working days only).
         </p>
+      </div>
+      <div className="rounded-xl border bg-card p-6 text-card-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Balance overview ({currentYear})</h2>
+          <p className="text-sm text-muted-foreground">Minutes shown as days/hours.</p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {leaveTypes.map((leaveType) => (
+            <div key={leaveType} className="rounded-lg border bg-muted/20 p-3 text-sm">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                {leaveType.replace('_', ' ')}
+              </div>
+              <div className="mt-1 font-semibold">
+                {formatBalance(balancesByType.get(leaveType))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
       <div className="grid gap-6 rounded-xl border bg-card p-6 text-card-foreground">
         <label className="flex flex-col gap-2 text-sm">
@@ -132,23 +236,69 @@ export function RequestLeavePage() {
           </select>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-2 text-sm">
-            Start
-            <Input
-              type="datetime-local"
-              value={startAt}
-              onChange={(event) => setStartAt(event.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            End
-            <Input
-              type="datetime-local"
-              value={endAt}
-              onChange={(event) => setEndAt(event.target.value)}
-            />
-          </label>
+          <div className="grid gap-3">
+            <label className="flex flex-col gap-2 text-sm">
+              Start date
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={startDate}
+                onChange={(event) => {
+                  setStartDate(event.target.value)
+                  if (endDate && event.target.value && endDate < event.target.value) {
+                    setEndDate('')
+                  }
+                }}
+              >
+                <option value="">Select a working day</option>
+                {workingDates.map((date) => (
+                  <option key={date.value} value={date.value}>
+                    {date.label} ({date.value})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 text-sm">
+              Start time
+              <Input
+                type="time"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+                disabled={isMultiDay}
+              />
+            </label>
+          </div>
+          <div className="grid gap-3">
+            <label className="flex flex-col gap-2 text-sm">
+              End date
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+              >
+                <option value="">Select a working day</option>
+                {endDateOptions.map((date) => (
+                  <option key={date.value} value={date.value}>
+                    {date.label} ({date.value})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 text-sm">
+              End time
+              <Input
+                type="time"
+                value={endTime}
+                onChange={(event) => setEndTime(event.target.value)}
+                disabled={isMultiDay}
+              />
+            </label>
+          </div>
         </div>
+        {isMultiDay ? (
+          <p className="text-xs text-muted-foreground">
+            Times are disabled for multi-day requests and treated as full working days.
+          </p>
+        ) : null}
         <label className="flex flex-col gap-2 text-sm">
           Note (optional)
           <Textarea
@@ -158,7 +308,7 @@ export function RequestLeavePage() {
           />
         </label>
         <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm">
-          Duration: {preview ?? '—'}
+          Working duration: {preview ?? '—'}
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <div className="flex justify-end">

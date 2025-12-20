@@ -17,9 +17,9 @@ describe('cancelLeaveRequest', () => {
   }
 
   it('allows cancelling when not approved', async () => {
-    const cancelLeaveRequestRepo = vi.fn().mockResolvedValue(undefined)
     const leaveRequestRepository = {
-      cancelLeaveRequest: cancelLeaveRequestRepo,
+      cancelLeaveRequest: vi.fn().mockResolvedValue(undefined),
+      cancelApprovedWithBalance: vi.fn(),
     }
 
     await cancelLeaveRequest(
@@ -27,7 +27,7 @@ describe('cancelLeaveRequest', () => {
       { request, actorUid: 'user-1', actorRole: 'employee', reason: null },
     )
 
-    expect(cancelLeaveRequestRepo).toHaveBeenCalledWith({
+    expect(leaveRequestRepository.cancelLeaveRequest).toHaveBeenCalledWith({
       requestId: 'req-1',
       actorUid: 'user-1',
       reason: null,
@@ -35,9 +35,9 @@ describe('cancelLeaveRequest', () => {
   })
 
   it('blocks non-admin from cancelling approved requests', async () => {
-    const cancelLeaveRequestRepo = vi.fn().mockResolvedValue(undefined)
     const leaveRequestRepository = {
-      cancelLeaveRequest: cancelLeaveRequestRepo,
+      cancelLeaveRequest: vi.fn().mockResolvedValue(undefined),
+      cancelApprovedWithBalance: vi.fn(),
     }
 
     await expect(
@@ -54,9 +54,10 @@ describe('cancelLeaveRequest', () => {
   })
 
   it('allows admin to cancel approved requests', async () => {
-    const cancelLeaveRequestRepo = vi.fn().mockResolvedValue(undefined)
+    const cancelApprovedWithBalance = vi.fn().mockResolvedValue(undefined)
     const leaveRequestRepository = {
-      cancelLeaveRequest: cancelLeaveRequestRepo,
+      cancelLeaveRequest: vi.fn().mockResolvedValue(undefined),
+      cancelApprovedWithBalance,
     }
 
     await cancelLeaveRequest(
@@ -69,9 +70,12 @@ describe('cancelLeaveRequest', () => {
       },
     )
 
-    expect(cancelLeaveRequestRepo).toHaveBeenCalledWith({
+    expect(cancelApprovedWithBalance).toHaveBeenCalledWith({
       requestId: 'req-1',
       actorUid: 'admin-1',
+      leaveTypeId: 'annual',
+      year: 2024,
+      durationMinutes: 120,
       reason: 'Cancelled by admin',
     })
   })

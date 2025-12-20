@@ -28,7 +28,8 @@ describe('approveLeaveRequest', () => {
     const approveAsTeamLead = vi.fn().mockResolvedValue(undefined)
     const leaveRequestRepository = {
       approveAsTeamLead,
-      approveAsManager: vi.fn(),
+      approveAsManagerWithBalance: vi.fn(),
+      approveAsTeamLeadWithBalance: vi.fn(),
     }
 
     await approveLeaveRequest(
@@ -44,10 +45,11 @@ describe('approveLeaveRequest', () => {
   })
 
   it('auto-approves when no manager exists', async () => {
-    const approveAsTeamLead = vi.fn().mockResolvedValue(undefined)
+    const approveAsTeamLeadWithBalance = vi.fn().mockResolvedValue(undefined)
     const leaveRequestRepository = {
-      approveAsTeamLead,
-      approveAsManager: vi.fn(),
+      approveAsTeamLead: vi.fn(),
+      approveAsTeamLeadWithBalance,
+      approveAsManagerWithBalance: vi.fn(),
     }
 
     await approveLeaveRequest(
@@ -60,18 +62,21 @@ describe('approveLeaveRequest', () => {
       },
     )
 
-    expect(approveAsTeamLead).toHaveBeenCalledWith({
+    expect(approveAsTeamLeadWithBalance).toHaveBeenCalledWith({
       requestId: 'req-1',
       actorUid: 'lead-1',
-      autoApprove: true,
+      leaveTypeId: 'annual',
+      year: 2024,
+      durationMinutes: 120,
     })
   })
 
   it('allows manager to approve TL-approved requests', async () => {
-    const approveAsManager = vi.fn().mockResolvedValue(undefined)
+    const approveAsManagerWithBalance = vi.fn().mockResolvedValue(undefined)
     const leaveRequestRepository = {
       approveAsTeamLead: vi.fn(),
-      approveAsManager,
+      approveAsTeamLeadWithBalance: vi.fn(),
+      approveAsManagerWithBalance,
     }
 
     await approveLeaveRequest(
@@ -84,18 +89,22 @@ describe('approveLeaveRequest', () => {
       },
     )
 
-    expect(approveAsManager).toHaveBeenCalledWith({
+    expect(approveAsManagerWithBalance).toHaveBeenCalledWith({
       requestId: 'req-1',
       actorUid: 'manager-1',
       direct: false,
+      leaveTypeId: 'annual',
+      year: 2024,
+      durationMinutes: 120,
     })
   })
 
   it('allows manager to approve team lead requests directly', async () => {
-    const approveAsManager = vi.fn().mockResolvedValue(undefined)
+    const approveAsManagerWithBalance = vi.fn().mockResolvedValue(undefined)
     const leaveRequestRepository = {
       approveAsTeamLead: vi.fn(),
-      approveAsManager,
+      approveAsTeamLeadWithBalance: vi.fn(),
+      approveAsManagerWithBalance,
     }
 
     await approveLeaveRequest(
@@ -108,17 +117,21 @@ describe('approveLeaveRequest', () => {
       },
     )
 
-    expect(approveAsManager).toHaveBeenCalledWith({
+    expect(approveAsManagerWithBalance).toHaveBeenCalledWith({
       requestId: 'req-1',
       actorUid: 'manager-1',
       direct: true,
+      leaveTypeId: 'annual',
+      year: 2024,
+      durationMinutes: 120,
     })
   })
 
   it('blocks team lead from approving their own request', async () => {
     const leaveRequestRepository = {
       approveAsTeamLead: vi.fn(),
-      approveAsManager: vi.fn(),
+      approveAsTeamLeadWithBalance: vi.fn(),
+      approveAsManagerWithBalance: vi.fn(),
     }
 
     await expect(
@@ -135,10 +148,11 @@ describe('approveLeaveRequest', () => {
   })
 
   it('allows admin to approve submitted requests directly', async () => {
-    const approveAsManager = vi.fn().mockResolvedValue(undefined)
+    const approveAsManagerWithBalance = vi.fn().mockResolvedValue(undefined)
     const leaveRequestRepository = {
       approveAsTeamLead: vi.fn(),
-      approveAsManager,
+      approveAsTeamLeadWithBalance: vi.fn(),
+      approveAsManagerWithBalance,
     }
 
     await approveLeaveRequest(
@@ -151,10 +165,13 @@ describe('approveLeaveRequest', () => {
       },
     )
 
-    expect(approveAsManager).toHaveBeenCalledWith({
+    expect(approveAsManagerWithBalance).toHaveBeenCalledWith({
       requestId: 'req-1',
       actorUid: 'admin-1',
       direct: true,
+      leaveTypeId: 'annual',
+      year: 2024,
+      durationMinutes: 120,
     })
   })
 })

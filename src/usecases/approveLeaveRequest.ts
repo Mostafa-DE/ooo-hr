@@ -19,22 +19,30 @@ export async function approveLeaveRequest(
   input: ApproveLeaveRequestInput,
 ) {
   const { request, team, actorUid, actorRole } = input
+  const durationMinutes = request.durationMinutes ?? request.requestedMinutes
+  const requestYear = request.year ?? request.startAt.getFullYear()
 
   if (actorRole === 'admin') {
     if (request.status === 'SUBMITTED') {
-      await context.leaveRequestRepository.approveAsManager({
+      await context.leaveRequestRepository.approveAsManagerWithBalance({
         requestId: request.id,
         actorUid,
         direct: true,
+        leaveTypeId: request.type,
+        year: requestYear,
+        durationMinutes,
       })
       return
     }
 
     if (request.status === 'TL_APPROVED') {
-      await context.leaveRequestRepository.approveAsManager({
+      await context.leaveRequestRepository.approveAsManagerWithBalance({
         requestId: request.id,
         actorUid,
         direct: false,
+        leaveTypeId: request.type,
+        year: requestYear,
+        durationMinutes,
       })
       return
     }
@@ -54,29 +62,45 @@ export async function approveLeaveRequest(
       throw new Error('Team lead cannot approve their own request.')
     }
 
-    await context.leaveRequestRepository.approveAsTeamLead({
-      requestId: request.id,
-      actorUid,
-      autoApprove: !team.managerUid,
-    })
+    if (!team.managerUid) {
+      await context.leaveRequestRepository.approveAsTeamLeadWithBalance({
+        requestId: request.id,
+        actorUid,
+        leaveTypeId: request.type,
+        year: requestYear,
+        durationMinutes,
+      })
+    } else {
+      await context.leaveRequestRepository.approveAsTeamLead({
+        requestId: request.id,
+        actorUid,
+        autoApprove: false,
+      })
+    }
     return
   }
 
   if (isManager) {
     if (request.status === 'TL_APPROVED') {
-      await context.leaveRequestRepository.approveAsManager({
+      await context.leaveRequestRepository.approveAsManagerWithBalance({
         requestId: request.id,
         actorUid,
         direct: false,
+        leaveTypeId: request.type,
+        year: requestYear,
+        durationMinutes,
       })
       return
     }
 
     if (request.status === 'SUBMITTED' && request.employeeUid === team.leadUid) {
-      await context.leaveRequestRepository.approveAsManager({
+      await context.leaveRequestRepository.approveAsManagerWithBalance({
         requestId: request.id,
         actorUid,
         direct: true,
+        leaveTypeId: request.type,
+        year: requestYear,
+        durationMinutes,
       })
       return
     }

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   computeMinutes,
+  computeWorkingMinutes,
+  formatDurationWithDays,
+  isWorkingDay,
   filterApprovedRequests,
   formatDateRange,
   formatDateRangeWithYear,
@@ -26,11 +29,41 @@ describe('computeMinutes', () => {
   })
 })
 
+describe('computeWorkingMinutes', () => {
+  it('counts minutes on working days only', () => {
+    const start = new Date('2025-12-20T09:00:00+03:00')
+    const end = new Date('2025-12-21T17:00:00+03:00')
+
+    expect(computeWorkingMinutes(start, end)).toBe(480)
+  })
+})
+
+describe('isWorkingDay', () => {
+  it('returns true for Sunday and false for Saturday', () => {
+    const sunday = new Date('2025-12-21T09:00:00+03:00')
+    const saturday = new Date('2025-12-20T09:00:00+03:00')
+
+    expect(isWorkingDay(sunday)).toBe(true)
+    expect(isWorkingDay(saturday)).toBe(false)
+  })
+})
+
 describe('formatDuration', () => {
   it('formats minutes into hours and minutes', () => {
     expect(formatDuration(150)).toBe('2h 30m')
     expect(formatDuration(60)).toBe('1h')
     expect(formatDuration(45)).toBe('45m')
+  })
+})
+
+describe('formatDurationWithDays', () => {
+  it('formats full-day blocks into days', () => {
+    expect(formatDurationWithDays(480)).toBe('1d')
+    expect(formatDurationWithDays(960)).toBe('2d')
+  })
+
+  it('formats days plus remainder', () => {
+    expect(formatDurationWithDays(600)).toBe('1d 2h')
   })
 })
 
@@ -114,10 +147,10 @@ describe('date helpers', () => {
     expect(startOfTomorrow(base)).toEqual(new Date(2024, 0, 16))
   })
 
-  it('calculates week boundaries on Monday', () => {
+  it('calculates week boundaries on Sunday', () => {
     const base = new Date(2024, 0, 17, 10, 0, 0, 0)
-    expect(startOfWeek(base)).toEqual(new Date(2024, 0, 15))
-    expect(startOfNextWeek(base)).toEqual(new Date(2024, 0, 22))
+    expect(startOfWeek(base)).toEqual(new Date(2024, 0, 14))
+    expect(startOfNextWeek(base)).toEqual(new Date(2024, 0, 21))
   })
 })
 
