@@ -1,0 +1,128 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userData() {
+      return userDoc().data;
+    }
+
+    function isWhitelisted() {
+      return isSignedIn() && userDoc().exists() && userData().isWhitelisted == true;
+    }
+
+    function isAdmin() {
+      return isWhitelisted() && userData().role == 'admin';
+    }
+
+    function isTeamLead() {
+      return isWhitelisted() && userData().role == 'team_lead';
+    }
+
+    function isManager() {
+      return isWhitelisted() && userData().role == 'manager';
+    }
+
+    function sameTeam(teamId) {
+      return isWhitelisted() && userData().teamId == teamId;
+    }
+
+    function teamForUser(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.teamId;
+    }
+
+    function canReadLeaveRequest(requestId) {
+      let requestDoc = get(/databases/$(database)/documents/leaveRequests/$(requestId));
+      return isWhitelisted()
+        && (isAdmin()
+          || requestDoc.data.employeeUid == request.auth.uid
+          || sameTeam(requestDoc.data.teamId));
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isWhitelisted());
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == 'employee'
+        && request.resource.data.isWhitelisted == false
+        && request.resource.data.teamId == null;
+      allow update: if isAdmin();
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).changedKeys()
+          .hasOnly(['email', 'displayName', 'photoURL', 'lastLoginAt'])
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.isWhitelisted == resource.data.isWhitelisted
+        && request.resource.data.teamId == resource.data.teamId;
+      allow delete: if false;
+    }
+
+    match /teams/{teamId} {
+      allow read: if isWhitelisted();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /leaveRequests/{requestId} {
+      allow read: if isWhitelisted()
+        && (isAdmin()
+          || resource.data.employeeUid == request.auth.uid
+          || sameTeam(resource.data.teamId));
+      allow create: if isWhitelisted()
+        && request.resource.data.employeeUid == request.auth.uid
+        && request.resource.data.teamId == userData().teamId;
+      allow update: if isAdmin();
+      allow update: if isWhitelisted()
+        && (isTeamLead() || isManager())
+        && sameTeam(resource.data.teamId)
+        && resource.data.employeeUid != request.auth.uid;
+      allow update: if isWhitelisted()
+        && resource.data.employeeUid == request.auth.uid
+        && resource.data.status in ['SUBMITTED', 'TL_APPROVED']
+        && request.resource.data.status == 'CANCELLED'
+        && request.resource.data.diff(resource.data).changedKeys()
+          .hasOnly(['status', 'updatedAt']);
+      allow delete: if false;
+
+      match /logs/{logId} {
+        allow read: if canReadLeaveRequest(requestId);
+        allow create: if isWhitelisted()
+          && (isAdmin()
+            || sameTeam(get(/databases/$(database)/documents/leaveRequests/$(requestId)).data.teamId)
+            || get(/databases/$(database)/documents/leaveRequests/$(requestId)).data.employeeUid
+              == request.auth.uid);
+        allow update, delete: if false;
+      }
+    }
+
+    match /leaveBalances/{balanceId} {
+      allow read: if isWhitelisted()
+        && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create, update: if isWhitelisted()
+        && (isAdmin()
+          || ((isTeamLead() || isManager())
+            && teamForUser(request.resource.data.userId) == userData().teamId));
+      allow delete: if false;
+    }
+
+    match /leaveBalanceAdjustments/{adjustmentId} {
+      allow read: if isWhitelisted()
+        && (isAdmin()
+          || resource.data.userId == request.auth.uid
+          || resource.data.uid == request.auth.uid
+          || resource.data.employeeUid == request.auth.uid);
+      allow create: if isWhitelisted()
+        && request.resource.data.actorUid == request.auth.uid
+        && (isAdmin()
+          || ((isTeamLead() || isManager())
+            && teamForUser(request.resource.data.userId) == userData().teamId));
+      allow update, delete: if false;
+    }
+  }
+}
