@@ -17,7 +17,7 @@ export const navigationItems = [
   },
   {
     label: 'My Requests',
-    to: '/my',
+    to: '/my-requests',
     description: 'Your leave requests and status',
   },
   {

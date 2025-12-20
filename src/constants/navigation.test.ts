@@ -16,6 +16,6 @@ describe('navigationItems', () => {
   it('includes the expected primary routes', () => {
     const paths = navigationItems.map((item) => item.to)
 
-    expect(paths).toEqual(['/', '/request', '/my', '/approvals', '/admin'])
+    expect(paths).toEqual(['/', '/request', '/my-requests', '/approvals', '/admin'])
   })
 })

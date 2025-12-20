@@ -39,7 +39,7 @@ export function AppShell() {
                 .filter((item) => (item.to === '/admin' ? isAdmin : true))
                 .filter((item) => (item.to === '/approvals' ? canSeeApprovals : true))
                 .filter((item) =>
-                  isAdmin && (item.to === '/request' || item.to === '/my') ? false : true,
+                  isAdmin && (item.to === '/request' || item.to === '/my-requests') ? false : true,
                 )
                 .map((item) => (
                 <NavLink

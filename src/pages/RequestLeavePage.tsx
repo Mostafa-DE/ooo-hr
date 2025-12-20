@@ -116,17 +116,7 @@ export function RequestLeavePage() {
     if (minutes === undefined) {
       return '—'
     }
-    const hours = Math.floor(minutes / 60)
-    const remainder = minutes % 60
-    const days = Math.floor(minutes / 480)
-    const parts = []
-    if (days > 0) {
-      parts.push(`${days}d`)
-    }
-    if (hours > 0 || remainder > 0) {
-      parts.push(remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`)
-    }
-    return parts.length > 0 ? parts.join(' · ') : '0m'
+    return formatDurationWithDays(minutes)
   }
 
   const handleSubmit = async () => {
@@ -172,7 +162,7 @@ export function RequestLeavePage() {
         title: 'Leave request submitted',
         description: 'Your request has been added to My Requests.',
       })
-      navigate('/my')
+      navigate('/my-requests')
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : 'Unable to submit request.'

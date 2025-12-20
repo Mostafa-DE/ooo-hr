@@ -21,10 +21,11 @@ import {
 } from '@/components/ui/table'
 import { useLeaveLogs } from '@/hooks/useLeaveLogs'
 import { useLeaveRequests } from '@/hooks/useLeaveRequests'
+import { useLeaveBalanceAdjustments } from '@/hooks/useLeaveBalanceAdjustments'
 import { useToast } from '@/hooks/useToast'
 import { useUsersList } from '@/hooks/useUsersList'
 import { useUserProfile } from '@/hooks/useUserProfile'
-import { formatDateTime, formatDuration } from '@/lib/leave'
+import { formatDateTime, formatDuration, formatDurationWithDays } from '@/lib/leave'
 import { useRepositories } from '@/lib/useRepositories'
 import type { LeaveRequest } from '@/types/leave'
 import { cancelLeaveRequest } from '@/usecases/cancelLeaveRequest'
@@ -43,6 +44,7 @@ export function MyRequestsPage() {
   const toast = useToast()
   const { profile } = useUserProfile()
   const { requests, loading, error } = useLeaveRequests(user?.uid ?? null)
+  const { adjustments } = useLeaveBalanceAdjustments(user?.uid ?? null)
   const [selected, setSelected] = useState<LeaveRequest | null>(null)
   const { logs } = useLeaveLogs(selected?.id ?? null)
   const { users } = useUsersList()
@@ -52,6 +54,18 @@ export function MyRequestsPage() {
   const userLabelById = useMemo(() => {
     return new Map(users.map((profile) => [profile.uid, profile.displayName]))
   }, [users])
+
+  const formatAdjustmentDelta = (minutes: number) => {
+    const label = formatDurationWithDays(Math.abs(minutes))
+    return minutes >= 0 ? `+${label}` : `-${label}`
+  }
+
+  const formatAdjustmentActor = (uid: string) => {
+    if (user && uid === user.uid) {
+      return 'You'
+    }
+    return 'Admin'
+  }
 
   const handleCancel = async (request: LeaveRequest) => {
     if (!user || !leaveRequestRepository) {
@@ -141,6 +155,39 @@ export function MyRequestsPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+      <div className="rounded-lg border bg-card p-4 text-card-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Balance adjustments</h2>
+          <p className="text-xs text-muted-foreground">
+            Latest updates to your leave balance.
+          </p>
+        </div>
+        <div className="mt-4 space-y-3">
+          {adjustments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No balance adjustments yet.
+            </p>
+          ) : (
+            adjustments.slice(0, 8).map((adjustment) => (
+              <div key={adjustment.id} className="rounded-md border bg-muted/20 p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 font-semibold">
+                  <span>
+                    {adjustment.leaveTypeId.replace('_', ' ')} · {adjustment.year}
+                  </span>
+                  <span>{formatAdjustmentDelta(adjustment.deltaMinutes)}</span>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {adjustment.createdAt ? formatDateTime(adjustment.createdAt) : '—'} ·{' '}
+                  {formatAdjustmentActor(adjustment.actorUid)}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Reason: {adjustment.reason || '—'}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>

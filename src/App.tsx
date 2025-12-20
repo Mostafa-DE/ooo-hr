@@ -19,7 +19,7 @@ export default function App() {
           <Route element={<AppShell />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/request" element={<RequestLeavePage />} />
-            <Route path="/my" element={<MyRequestsPage />} />
+            <Route path="/my-requests" element={<MyRequestsPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="*" element={<NotFoundPage />} />

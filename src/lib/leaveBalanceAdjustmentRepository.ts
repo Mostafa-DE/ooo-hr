@@ -6,7 +6,6 @@ import {
   serverTimestamp,
   type Firestore,
   where,
-  orderBy,
   Timestamp,
 } from 'firebase/firestore'
 
@@ -74,28 +73,62 @@ export function createLeaveBalanceAdjustmentRepository(
       })
     },
     subscribeUserAdjustments: (userId, onData, onError) => {
-      const adjustmentsQuery = query(
-        collection(db, 'leaveBalanceAdjustments'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-      )
+      const sources: Record<string, LeaveBalanceAdjustment[]> = {
+        userId: [],
+        uid: [],
+        employeeUid: [],
+      }
 
-      return onSnapshot(
-        adjustmentsQuery,
-        (snapshot) => {
-          const adjustments = snapshot.docs.map((docSnapshot) =>
-            buildAdjustment(docSnapshot.data(), docSnapshot.id),
-          )
-          onData(adjustments)
-        },
-        (error) => {
-          onError?.(
-            error instanceof Error
-              ? error
-              : new Error('Failed to load balance adjustments'),
-          )
-        },
-      )
+      const mergeAndNotify = () => {
+        const merged = new Map<string, LeaveBalanceAdjustment>()
+        Object.values(sources).forEach((list) => {
+          list.forEach((adjustment) => {
+            merged.set(adjustment.id, adjustment)
+          })
+        })
+
+        const sorted = Array.from(merged.values()).sort((a, b) => {
+          const aTime = a.createdAt?.getTime() ?? 0
+          const bTime = b.createdAt?.getTime() ?? 0
+          return bTime - aTime
+        })
+
+        onData(sorted)
+      }
+
+      const subscribeForField = (field: keyof typeof sources) => {
+        const adjustmentsQuery = query(
+          collection(db, 'leaveBalanceAdjustments'),
+          where(field, '==', userId),
+        )
+
+        return onSnapshot(
+          adjustmentsQuery,
+          (snapshot) => {
+            sources[field] = snapshot.docs.map((docSnapshot) =>
+              buildAdjustment(docSnapshot.data(), docSnapshot.id),
+            )
+            mergeAndNotify()
+          },
+          (error) => {
+            onError?.(
+              error instanceof Error
+                ? error
+                : new Error('Failed to load balance adjustments'),
+            )
+          },
+        )
+      }
+
+      const unsubscribeUserId = subscribeForField('userId')
+      const unsubscribeUid = subscribeForField('uid')
+      const unsubscribeEmployeeUid = subscribeForField('employeeUid')
+
+      return () => {
+        unsubscribeUserId()
+        unsubscribeUid()
+        unsubscribeEmployeeUid()
+      }
     },
   }
 }

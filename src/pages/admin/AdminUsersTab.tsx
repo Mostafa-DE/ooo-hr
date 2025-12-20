@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import { useLeaveBalanceAdjustments } from "@/hooks/useLeaveBalanceAdjustments";
 import { useToast } from "@/hooks/useToast";
 import { useRepositories } from "@/lib/useRepositories";
 import { isStaleBalanceYear } from "@/lib/balance";
+import { formatDurationWithDays } from "@/lib/leave";
 import { findTeamLeadConflict } from "@/lib/teams";
 import type { LeaveRequest } from "@/types/leave";
 import type { UserProfile, UserRole } from "@/types/user";
@@ -64,6 +65,7 @@ type UserRowProps = {
     role: UserRole;
   }) => Promise<void>;
   onOpenBalances: (user: UserProfile) => void;
+  onOpenAdjustments: (user: UserProfile) => void;
 };
 
 function UserRow({
@@ -78,6 +80,7 @@ function UserRow({
   onCancelPending,
   onUpdateTeamAssignments,
   onOpenBalances,
+  onOpenAdjustments,
 }: UserRowProps) {
   const [isWhitelisted, setIsWhitelisted] = useState(user.isWhitelisted);
   const [role, setRole] = useState<UserRole>(user.role);
@@ -262,7 +265,14 @@ function UserRow({
             variant="secondary"
             onClick={() => onOpenBalances(user)}
           >
-            Balances
+            Adjust balances
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => onOpenAdjustments(user)}
+          >
+            Balance adjustments
           </Button>
         </div>
       </td>
@@ -282,6 +292,9 @@ export function AdminUsersTab() {
   const { user: adminUser } = useAuth();
   const toast = useToast();
   const [balanceUser, setBalanceUser] = useState<UserProfile | null>(null);
+  const [adjustmentsUser, setAdjustmentsUser] = useState<UserProfile | null>(
+    null
+  );
   const [balanceType, setBalanceType] = useState<LeaveType>("annual");
   const [balanceYear, setBalanceYear] = useState(new Date().getFullYear());
   const [deltaMinutes, setDeltaMinutes] = useState("");
@@ -291,11 +304,17 @@ export function AdminUsersTab() {
   const [carrying, setCarrying] = useState(false);
 
   const { balances } = useLeaveBalances(balanceUser?.uid ?? null);
-  const { adjustments } = useLeaveBalanceAdjustments(balanceUser?.uid ?? null);
+  const { adjustments } = useLeaveBalanceAdjustments(
+    adjustmentsUser?.uid ?? null
+  );
 
   const teamNameById = useMemo(() => {
     return new Map(teams.map((team) => [team.id, team.name]));
   }, [teams]);
+
+  const userNameById = useMemo(() => {
+    return new Map(users.map((userProfile) => [userProfile.uid, userProfile.displayName]));
+  }, [users]);
 
   const teamOptions = useMemo(() => {
     return teams.map((team) => ({ id: team.id, name: team.name }));
@@ -372,6 +391,31 @@ export function AdminUsersTab() {
     }
   };
 
+  const currentYear = new Date().getFullYear();
+  const hasStaleBalance = balances.some((balance) =>
+    isStaleBalanceYear(balance.year, currentYear)
+  );
+
+  const selectedBalance = balances.find(
+    (balance) =>
+      balance.leaveTypeId === balanceType && balance.year === balanceYear
+  );
+
+  useEffect(() => {
+    if (!balanceUser) {
+      return;
+    }
+
+    const yearsForType = balances
+      .filter((balance) => balance.leaveTypeId === balanceType)
+      .map((balance) => balance.year)
+      .sort((a, b) => b - a);
+
+    if (yearsForType.length > 0 && !yearsForType.includes(balanceYear)) {
+      setBalanceYear(yearsForType[0]);
+    }
+  }, [balanceType, balanceUser, balanceYear, balances]);
+
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading users...</p>;
   }
@@ -410,31 +454,27 @@ export function AdminUsersTab() {
     return <p className="text-sm text-destructive">Admin user unavailable.</p>;
   }
 
-  const currentYear = new Date().getFullYear();
-  const hasStaleBalance = balances.some((balance) =>
-    isStaleBalanceYear(balance.year, currentYear)
-  );
-
-  const selectedBalance = balances.find(
-    (balance) =>
-      balance.leaveTypeId === balanceType && balance.year === balanceYear
-  );
-
   const formatBalance = (minutes: number | undefined) => {
     if (minutes === undefined) {
       return "—";
     }
-    const hours = Math.floor(minutes / 60);
-    const remainder = minutes % 60;
-    const days = Math.floor(minutes / 480);
-    const parts = [];
-    if (days > 0) {
-      parts.push(`${days}d`);
+    return formatDurationWithDays(minutes);
+  };
+
+  const formatAdjustmentDelta = (minutes: number) => {
+    const label = formatDurationWithDays(Math.abs(minutes));
+    return minutes >= 0 ? `+${label}` : `-${label}`;
+  };
+
+  const formatAdjustmentDate = (value?: Date) => {
+    if (!value) {
+      return "—";
     }
-    if (hours > 0 || remainder > 0) {
-      parts.push(remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`);
-    }
-    return parts.length > 0 ? parts.join(" · ") : "0m";
+    return value.toLocaleString();
+  };
+
+  const formatActorLabel = (uid: string) => {
+    return userNameById.get(uid) ?? uid;
   };
 
   const handleOpenBalances = (user: UserProfile) => {
@@ -446,22 +486,23 @@ export function AdminUsersTab() {
     setReference("");
   };
 
+  const handleOpenAdjustments = (user: UserProfile) => {
+    setAdjustmentsUser(user);
+  };
+
   const deltaPresets = [
-    { label: "Add 30m", value: 30 },
-    { label: "Add 1h", value: 60 },
-    { label: "Add 2h", value: 120 },
-    { label: "Add 4h", value: 240 },
-    { label: "Add 1 day (8h)", value: 480 },
-    { label: "Add 2 days", value: 960 },
-    { label: "Add 3 days", value: 1440 },
-    { label: "Remove 30m", value: -30 },
-    { label: "Remove 1h", value: -60 },
-    { label: "Remove 2h", value: -120 },
-    { label: "Remove 4h", value: -240 },
-    { label: "Remove 1 day (8h)", value: -480 },
-    { label: "Remove 2 days", value: -960 },
-    { label: "Remove 3 days", value: -1440 },
+    { label: "30m", value: 30 },
+    { label: "1h", value: 60 },
+    { label: "1d", value: 480 },
   ] as const;
+
+  const applyDeltaPreset = (value: number) => {
+    setDeltaMinutes((current) => {
+      const parsed = Number.parseInt(current, 10);
+      const base = Number.isNaN(parsed) ? 0 : parsed;
+      return String(base + value);
+    });
+  };
 
   const handleAdjustBalance = async () => {
     if (!balanceUser || !leaveBalanceRepository) {
@@ -581,6 +622,7 @@ export function AdminUsersTab() {
                 onCancelPending={leaveRequestRepository.cancelLeaveRequest}
                 onUpdateTeamAssignments={updateTeamAssignments}
                 onOpenBalances={handleOpenBalances}
+                onOpenAdjustments={handleOpenAdjustments}
               />
             ))}
           </tbody>
@@ -590,9 +632,10 @@ export function AdminUsersTab() {
         open={Boolean(balanceUser)}
         onOpenChange={(open) => !open && setBalanceUser(null)}
       >
-        <DialogContent>
+        <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden">
           {balanceUser ? (
-            <div className="space-y-4">
+            <>
+              <div className="flex-1 space-y-4 overflow-y-auto pr-1">
               <DialogHeader>
                 <DialogTitle>
                   Balances for {balanceUser.displayName}
@@ -667,26 +710,11 @@ export function AdminUsersTab() {
                       onChange={(event) => setDeltaMinutes(event.target.value)}
                       placeholder="e.g. -120 or 240"
                     />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    Quick preset
-                    <select
-                      className="h-9 rounded-md border bg-background px-2 text-sm"
-                      value=""
-                      onChange={(event) => {
-                        const value = Number.parseInt(event.target.value, 10);
-                        if (!Number.isNaN(value)) {
-                          setDeltaMinutes(String(value));
-                        }
-                      }}
-                    >
-                      <option value="">Select preset</option>
-                      {deltaPresets.map((preset) => (
-                        <option key={preset.label} value={preset.value}>
-                          {preset.label}
-                        </option>
-                      ))}
-                    </select>
+                    <span className="text-xs text-muted-foreground">
+                      {Number.isNaN(Number.parseInt(deltaMinutes, 10)) || deltaMinutes.trim() === ""
+                        ? "Preview: —"
+                        : `Preview: ${formatDurationWithDays(Number.parseInt(deltaMinutes, 10))}`}
+                    </span>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     Reference (optional)
@@ -695,6 +723,40 @@ export function AdminUsersTab() {
                       onChange={(event) => setReference(event.target.value)}
                     />
                   </label>
+                </div>
+                <div className="grid gap-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Add
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {deltaPresets.map((preset) => (
+                      <Button
+                        key={`add-${preset.label}`}
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => applyDeltaPreset(preset.value)}
+                      >
+                        +{preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Remove
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {deltaPresets.map((preset) => (
+                      <Button
+                        key={`remove-${preset.label}`}
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => applyDeltaPreset(-preset.value)}
+                      >
+                        -{preset.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
                 <label className="flex flex-col gap-1 text-sm">
                   Reason
@@ -705,22 +767,8 @@ export function AdminUsersTab() {
                   />
                 </label>
               </div>
-              <div className="rounded-lg border bg-muted/20 p-3 text-sm">
-                <div className="font-semibold">Recent adjustments</div>
-                <ul className="mt-2 space-y-1 text-muted-foreground">
-                  {adjustments.length === 0 ? (
-                    <li>No adjustments yet.</li>
-                  ) : (
-                    adjustments.slice(0, 5).map((adjustment) => (
-                      <li key={adjustment.id}>
-                        {adjustment.deltaMinutes}m · {adjustment.leaveTypeId} ·{" "}
-                        {adjustment.year} · {adjustment.reason}
-                      </li>
-                    ))
-                  )}
-                </ul>
               </div>
-              <DialogFooter>
+              <DialogFooter className="border-t bg-card pt-4">
                 <Button onClick={handleAdjustBalance} disabled={adjusting}>
                   {adjusting ? "Saving..." : "Save adjustment"}
                 </Button>
@@ -731,7 +779,72 @@ export function AdminUsersTab() {
                   Close
                 </Button>
               </DialogFooter>
-            </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(adjustmentsUser)}
+        onOpenChange={(open) => !open && setAdjustmentsUser(null)}
+      >
+        <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden">
+          {adjustmentsUser ? (
+            <>
+              <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+                <DialogHeader>
+                  <DialogTitle>
+                    Balance adjustments for {adjustmentsUser.displayName}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Review the latest balance adjustments for this user.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                  <div className="font-semibold">Recent adjustments</div>
+                  {adjustments.length === 0 ? (
+                    <p className="mt-2 text-muted-foreground">
+                      No adjustments yet.
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-3">
+                      {adjustments.map((adjustment) => (
+                        <div
+                          key={adjustment.id}
+                          className="rounded-md border bg-background p-3"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">
+                            <span>
+                              {adjustment.leaveTypeId.replace("_", " ")} ·{" "}
+                              {adjustment.year}
+                            </span>
+                            <span>{formatAdjustmentDelta(adjustment.deltaMinutes)}</span>
+                          </div>
+                          <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                            <div>Date: {formatAdjustmentDate(adjustment.createdAt)}</div>
+                            <div>
+                              Actor: {adjustment.actorUid ? formatActorLabel(adjustment.actorUid) : "—"}
+                            </div>
+                            <div>Source: {adjustment.source}</div>
+                            <div>Reference: {adjustment.reference ?? "—"}</div>
+                          </div>
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            Reason: {adjustment.reason || "—"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <DialogFooter className="border-t bg-card pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => setAdjustmentsUser(null)}
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </>
           ) : null}
         </DialogContent>
       </Dialog>

@@ -146,7 +146,7 @@ export function ApprovalsPage() {
 
       return false
     })
-  }, [requests, team, user])
+  }, [isAdmin, requests, team, user])
 
   const historyRequests = useMemo(() => {
     const pendingIds = new Set(pendingRequests.map((request) => request.id))

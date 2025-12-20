@@ -277,7 +277,7 @@ function CalendarLeaveBarRow({
             {leaveTypeLabels[leave.type]}
           </span>
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">
+        <div className="mt-1 break-all text-xs text-muted-foreground">
           {profile?.email ?? '—'}
         </div>
         <div className="mt-1 text-xs">{formatDateRangeWithYear(leave)}</div>
@@ -313,7 +313,7 @@ function LeaveMeta({
           {leaveTypeLabels[leave.type]}
         </span>
       </div>
-      <div className="mt-1 text-xs text-muted-foreground">
+      <div className="mt-1 break-all text-xs text-muted-foreground">
         {profile?.email ?? '—'}
       </div>
       <div className="mt-1 text-xs">
