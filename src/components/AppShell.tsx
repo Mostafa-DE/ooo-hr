@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 
 import { useAuth } from '@/auth/useAuth'
 import { buttonVariants } from '@/components/ui/buttonVariants'
@@ -59,6 +59,14 @@ export function AppShell() {
             </nav>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {!isAdmin ? (
+              <Link
+                to="/request"
+                className={cn(buttonVariants({ variant: 'default', size: 'sm' }))}
+              >
+                Request Leave
+              </Link>
+            ) : null}
             <div className="flex items-center gap-3">
               {photoURL ? (
                 <img

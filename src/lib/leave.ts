@@ -160,7 +160,7 @@ export function rangesOverlap(
 
 export function formatTimeRange(leave: LeaveRequest) {
   if (isFullDayRange(leave.startAt, leave.endAt)) {
-    return 'Full day'
+    return null
   }
 
   if (isSameDay(leave.startAt, leave.endAt)) {

@@ -129,6 +129,9 @@ type TeamRowProps = {
 function TeamRow({ team, users, memberCount, onEdit }: TeamRowProps) {
   const lead = users.find((user) => user.uid === team.leadUid)
   const manager = users.find((user) => user.uid === team.managerUid)
+  const members = users
+    .filter((user) => user.teamId === team.id && user.role !== 'admin')
+    .map((user) => user.displayName || user.email || '—')
 
   return (
     <div className="rounded-lg border p-4">
@@ -139,6 +142,20 @@ function TeamRow({ team, users, memberCount, onEdit }: TeamRowProps) {
             Lead: {lead ? buildUserLabel(lead) : '—'} · Manager:{' '}
             {manager ? buildUserLabel(manager) : '—'} · Members: {memberCount}
           </p>
+          <div className="mt-2 text-sm text-muted-foreground">
+            Members:{' '}
+            {members.length > 0 ? (
+              <span className="inline-flex flex-wrap gap-2">
+                {members.map((member) => (
+                  <span key={member} className="rounded-md border bg-muted/30 px-2 py-0.5 text-xs">
+                    {member}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              '—'
+            )}
+          </div>
         </div>
         <Button size="sm" variant="secondary" onClick={() => onEdit(team.id)}>
           Edit

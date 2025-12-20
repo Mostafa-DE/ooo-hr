@@ -67,6 +67,40 @@ export function MyRequestsPage() {
     return 'Admin'
   }
 
+  const formatLeaveTypeLabel = (value: string) =>
+    value.charAt(0).toUpperCase() + value.slice(1).replace('_', ' ')
+
+  const groupedAdjustments = useMemo(() => {
+    const grouped = new Map<string, typeof adjustments>()
+    adjustments.forEach((adjustment) => {
+      const existing = grouped.get(adjustment.leaveTypeId)
+      if (existing) {
+        existing.push(adjustment)
+      } else {
+        grouped.set(adjustment.leaveTypeId, [adjustment])
+      }
+    })
+
+    return Array.from(grouped.entries())
+      .map(([leaveType, items]) => {
+        const yearMap = new Map<number, typeof items>()
+        items.forEach((item) => {
+          const existing = yearMap.get(item.year)
+          if (existing) {
+            existing.push(item)
+          } else {
+            yearMap.set(item.year, [item])
+          }
+        })
+        const years = Array.from(yearMap.entries())
+          .map(([year, yearItems]) => ({ year, items: yearItems }))
+          .sort((a, b) => b.year - a.year)
+
+        return { leaveType, years }
+      })
+      .sort((a, b) => a.leaveType.localeCompare(b.leaveType))
+  }, [adjustments])
+
   const handleCancel = async (request: LeaveRequest) => {
     if (!user || !leaveRequestRepository) {
       return
@@ -164,28 +198,51 @@ export function MyRequestsPage() {
           </p>
         </div>
         <div className="mt-4 space-y-3">
-          {adjustments.length === 0 ? (
+          {groupedAdjustments.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No balance adjustments yet.
             </p>
           ) : (
-            adjustments.slice(0, 8).map((adjustment) => (
-              <div key={adjustment.id} className="rounded-md border bg-muted/20 p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2 font-semibold">
-                  <span>
-                    {adjustment.leaveTypeId.replace('_', ' ')} · {adjustment.year}
-                  </span>
-                  <span>{formatAdjustmentDelta(adjustment.deltaMinutes)}</span>
+            <div className="space-y-3">
+              {groupedAdjustments.map((group) => (
+                <div key={group.leaveType} className="rounded-md border bg-muted/20 p-3">
+                  <div className="text-sm font-semibold">
+                    {formatLeaveTypeLabel(group.leaveType)} ·{' '}
+                    {group.years.reduce((sum, yearGroup) => sum + yearGroup.items.length, 0)}
+                  </div>
+                  <div className="mt-3 space-y-4">
+                    {group.years.map((yearGroup) => (
+                      <div key={`${group.leaveType}-${yearGroup.year}`}>
+                        <div className="text-xs font-semibold text-muted-foreground">
+                          Year {yearGroup.year}
+                        </div>
+                        <div className="mt-2 space-y-3">
+                          {yearGroup.items.map((adjustment) => (
+                            <div
+                              key={adjustment.id}
+                              className="rounded-md border bg-background p-3 text-sm"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2 font-semibold">
+                                <span>
+                                  {adjustment.createdAt
+                                    ? formatDateTime(adjustment.createdAt)
+                                    : '—'}{' '}
+                                  · {formatAdjustmentActor(adjustment.actorUid)}
+                                </span>
+                                <span>{formatAdjustmentDelta(adjustment.deltaMinutes)}</span>
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Reason: {adjustment.reason || '—'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  {adjustment.createdAt ? formatDateTime(adjustment.createdAt) : '—'} ·{' '}
-                  {formatAdjustmentActor(adjustment.actorUid)}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Reason: {adjustment.reason || '—'}
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </div>

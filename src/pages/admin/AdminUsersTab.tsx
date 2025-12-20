@@ -23,6 +23,7 @@ import { isStaleBalanceYear } from "@/lib/balance";
 import { formatDurationWithDays } from "@/lib/leave";
 import { findTeamLeadConflict } from "@/lib/teams";
 import type { LeaveRequest } from "@/types/leave";
+import type { LeaveBalanceAdjustment } from "@/types/balance";
 import type { UserProfile, UserRole } from "@/types/user";
 import type { LeaveType } from "@/types/leave";
 import { adjustLeaveBalance } from "@/usecases/adjustLeaveBalance";
@@ -37,6 +38,10 @@ function formatTimestamp(value?: { toDate: () => Date }) {
   }
 
   return value.toDate().toLocaleString();
+}
+
+function formatLeaveTypeLabel(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1).replace("_", " ");
 }
 
 type UserRowProps = {
@@ -264,6 +269,7 @@ function UserRow({
             size="sm"
             variant="secondary"
             onClick={() => onOpenBalances(user)}
+            disabled={isAdmin}
           >
             Adjust balances
           </Button>
@@ -307,6 +313,24 @@ export function AdminUsersTab() {
   const { adjustments } = useLeaveBalanceAdjustments(
     adjustmentsUser?.uid ?? null
   );
+  const groupedAdjustments = useMemo(() => {
+    const grouped = new Map<string, LeaveBalanceAdjustment[]>();
+    adjustments.forEach((adjustment) => {
+      const existing = grouped.get(adjustment.leaveTypeId);
+      if (existing) {
+        existing.push(adjustment);
+      } else {
+        grouped.set(adjustment.leaveTypeId, [adjustment]);
+      }
+    });
+
+    return leaveTypeOptions
+      .map((leaveType) => ({
+        leaveType,
+        items: grouped.get(leaveType) ?? [],
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [adjustments]);
 
   const teamNameById = useMemo(() => {
     return new Map(teams.map((team) => [team.id, team.name]));
@@ -800,35 +824,59 @@ export function AdminUsersTab() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="rounded-lg border bg-muted/20 p-3 text-sm">
-                  <div className="font-semibold">Recent adjustments</div>
-                  {adjustments.length === 0 ? (
+                  <div className="font-semibold">
+                    Recent adjustments by leave type
+                  </div>
+                  {groupedAdjustments.length === 0 ? (
                     <p className="mt-2 text-muted-foreground">
                       No adjustments yet.
                     </p>
                   ) : (
-                    <div className="mt-3 space-y-3">
-                      {adjustments.map((adjustment) => (
+                    <div className="mt-3 space-y-4">
+                      {groupedAdjustments.map((group) => (
                         <div
-                          key={adjustment.id}
+                          key={group.leaveType}
                           className="rounded-md border bg-background p-3"
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">
-                            <span>
-                              {adjustment.leaveTypeId.replace("_", " ")} ·{" "}
-                              {adjustment.year}
-                            </span>
-                            <span>{formatAdjustmentDelta(adjustment.deltaMinutes)}</span>
+                          <div className="text-sm font-semibold">
+                            {formatLeaveTypeLabel(group.leaveType)} ·{" "}
+                            {group.items.length}
                           </div>
-                          <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-                            <div>Date: {formatAdjustmentDate(adjustment.createdAt)}</div>
-                            <div>
-                              Actor: {adjustment.actorUid ? formatActorLabel(adjustment.actorUid) : "—"}
-                            </div>
-                            <div>Source: {adjustment.source}</div>
-                            <div>Reference: {adjustment.reference ?? "—"}</div>
-                          </div>
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            Reason: {adjustment.reason || "—"}
+                          <div className="mt-3 space-y-3">
+                            {group.items.map((adjustment) => (
+                              <div
+                                key={adjustment.id}
+                                className="rounded-md border bg-muted/20 p-3"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">
+                                  <span>Year {adjustment.year}</span>
+                                  <span>
+                                    {formatAdjustmentDelta(
+                                      adjustment.deltaMinutes
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                                  <div>
+                                    Date:{" "}
+                                    {formatAdjustmentDate(adjustment.createdAt)}
+                                  </div>
+                                  <div>
+                                    Actor:{" "}
+                                    {adjustment.actorUid
+                                      ? formatActorLabel(adjustment.actorUid)
+                                      : "—"}
+                                  </div>
+                                  <div>Source: {adjustment.source}</div>
+                                  <div>
+                                    Reference: {adjustment.reference ?? "—"}
+                                  </div>
+                                </div>
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Reason: {adjustment.reason || "—"}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       ))}

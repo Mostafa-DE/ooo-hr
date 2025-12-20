@@ -32,13 +32,11 @@ const leaveTypeLabels: Record<LeaveType, string> = {
 
 type TeamCalendarWidgetProps = {
   teamId: string | null
-  showPendingBadge?: boolean
   includeAllTeams?: boolean
 }
 
 export function TeamCalendarWidget({
   teamId,
-  showPendingBadge = false,
   includeAllTeams = false,
 }: TeamCalendarWidgetProps) {
   const { requests, usersById, loading, error } = useTeamCalendar(teamId, includeAllTeams)
@@ -49,12 +47,17 @@ export function TeamCalendarWidget({
   const nextWeekStart = startOfNextWeek(now)
   const weekDays = getWeekDays(now)
   const monthWeeks = getMonthWeeks(now)
+  const yearStart = new Date(now.getFullYear(), 0, 1)
+  const yearEnd = new Date(now.getFullYear() + 1, 0, 1)
 
   const weekLeaves = requests.filter((request) =>
     overlaps(request.startAt, request.endAt, weekStart, nextWeekStart),
   )
 
   const monthLeaves = requests
+  const yearLeaves = requests.filter((request) =>
+    overlaps(request.startAt, request.endAt, yearStart, yearEnd),
+  )
 
   const statusMessage = (emptyText: string) => {
     if (loading) {
@@ -81,10 +84,7 @@ export function TeamCalendarWidget({
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-semibold">Team Out of Office</h2>
-          {showPendingBadge ? (
-            <Badge variant="outline">Pending approvals</Badge>
-          ) : null}
+          <h2 className="text-lg font-semibold">Team Leaves (Out Of Office)</h2>
           {includeAllTeams ? <Badge variant="secondary">All teams</Badge> : null}
         </div>
       </div>
@@ -92,6 +92,7 @@ export function TeamCalendarWidget({
         <TabsList>
           <TabsTrigger value="week">Week</TabsTrigger>
           <TabsTrigger value="month">Month</TabsTrigger>
+          <TabsTrigger value="year">Year</TabsTrigger>
         </TabsList>
         <TabsContent value="week">
           {weekLeaves.length === 0 ? (
@@ -157,6 +158,38 @@ export function TeamCalendarWidget({
                         ))}
                       </CalendarWeekGrid>
                     )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="year">
+          {yearLeaves.length === 0 ? (
+            statusMessage('No approved leaves this year.')
+          ) : (
+            <div className="space-y-4">
+              {Array.from({ length: 12 }, (_, index) => {
+                const monthStart = new Date(now.getFullYear(), index, 1)
+                const monthEnd = new Date(now.getFullYear(), index + 1, 1)
+                const monthLeavesForYear = yearLeaves.filter((leave) =>
+                  overlaps(leave.startAt, leave.endAt, monthStart, monthEnd),
+                )
+
+                if (monthLeavesForYear.length === 0) {
+                  return null
+                }
+
+                return (
+                  <div key={monthStart.toISOString()} className="rounded-lg border bg-background p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {monthLeavesForYear.map((leave) => (
+                        <LeaveMeta key={leave.id} leave={leave} usersById={usersById} />
+                      ))}
+                    </div>
                   </div>
                 )
               })}
@@ -259,7 +292,6 @@ function CalendarLeaveBarRow({
   const timeLabel = formatTimeRange(leave)
   const durationLabel =
     leave.requestedMinutes > 0 ? formatDuration(leave.requestedMinutes) : null
-  const metaLabel = timeLabel === 'Full day' ? 'Full day' : 'Partial'
   const colorClass = getUserColorClass(leave.employeeUid)
   const columnStyle = {
     gridColumn: `${startIndex + 1} / ${endIndex + 2}`,
@@ -282,9 +314,9 @@ function CalendarLeaveBarRow({
         </div>
         <div className="mt-1 text-xs">{formatDateRangeWithYear(leave)}</div>
         <div className="mt-1 text-xs">
-          {metaLabel}
-          {timeLabel && timeLabel !== 'Full day' ? ` · ${timeLabel}` : ''}
-          {durationLabel ? ` · ${durationLabel}` : ''}
+          {timeLabel ? timeLabel : null}
+          {timeLabel && durationLabel ? ' · ' : null}
+          {durationLabel ? durationLabel : null}
         </div>
       </div>
     </div>
@@ -302,7 +334,6 @@ function LeaveMeta({
   const timeLabel = formatTimeRange(leave)
   const durationLabel =
     leave.requestedMinutes > 0 ? formatDuration(leave.requestedMinutes) : null
-  const metaLabel = timeLabel === 'Full day' ? 'Full day' : 'Partial'
   const colorClass = getUserColorClass(leave.employeeUid)
 
   return (
@@ -317,8 +348,8 @@ function LeaveMeta({
         {profile?.email ?? '—'}
       </div>
       <div className="mt-1 text-xs">
-        {formatDateRangeWithYear(leave)} · {metaLabel}
-        {timeLabel && timeLabel !== 'Full day' ? ` · ${timeLabel}` : ''}
+        {formatDateRangeWithYear(leave)}
+        {timeLabel ? ` · ${timeLabel}` : ''}
         {durationLabel ? ` · ${durationLabel}` : ''}
       </div>
     </div>

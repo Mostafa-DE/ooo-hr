@@ -187,32 +187,32 @@ describe('format helpers', () => {
     note: null,
   }
 
-  it('formats same-day partial leave time range', () => {
+  it('formats same-day leave time range', () => {
     expect(formatTimeRange(baseRequest)).toBe('10:00 → 13:00')
     expect(formatDateRange(baseRequest)).toBe('Dec 19')
     expect(formatDateRangeWithYear(baseRequest)).toBe('Dec 19, 2024')
   })
 
-  it('formats full-day ranges', () => {
+  it('formats full-day ranges without a time label', () => {
     const fullDay: LeaveRequest = {
       ...baseRequest,
       startAt: new Date(2024, 11, 19, 0, 0, 0, 0),
       endAt: new Date(2024, 11, 20, 0, 0, 0, 0),
     }
 
-    expect(formatTimeRange(fullDay)).toBe('Full day')
+    expect(formatTimeRange(fullDay)).toBeNull()
     expect(formatDateRange(fullDay)).toBe('Dec 19')
     expect(formatDateRangeWithYear(fullDay)).toBe('Dec 19, 2024')
   })
 
-  it('formats multi-day ranges', () => {
+  it('formats multi-day ranges without a time label', () => {
     const multiDay: LeaveRequest = {
       ...baseRequest,
       startAt: new Date(2024, 11, 19, 0, 0, 0, 0),
       endAt: new Date(2024, 11, 22, 0, 0, 0, 0),
     }
 
-    expect(formatTimeRange(multiDay)).toBe('Full day')
+    expect(formatTimeRange(multiDay)).toBeNull()
     expect(formatDateRange(multiDay)).toBe('Dec 19 → Dec 21')
     expect(formatDateRangeWithYear(multiDay)).toBe('Dec 19, 2024 → Dec 21, 2024')
     expect(getDisplayEndDate(multiDay)).toEqual(new Date(2024, 11, 21, 0, 0, 0, 0))
