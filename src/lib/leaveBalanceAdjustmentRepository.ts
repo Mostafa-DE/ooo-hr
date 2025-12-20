@@ -25,6 +25,10 @@ export type CreateLeaveBalanceAdjustmentInput = {
 
 type LeaveBalanceAdjustmentRepository = {
   createAdjustment: (input: CreateLeaveBalanceAdjustmentInput) => Promise<void>
+  subscribeAllAdjustments: (
+    onData: (adjustments: LeaveBalanceAdjustment[]) => void,
+    onError?: (error: Error) => void,
+  ) => () => void
   subscribeUserAdjustments: (
     userId: string,
     onData: (adjustments: LeaveBalanceAdjustment[]) => void,
@@ -71,6 +75,30 @@ export function createLeaveBalanceAdjustmentRepository(
         source: input.source,
         createdAt: serverTimestamp(),
       })
+    },
+    subscribeAllAdjustments: (onData, onError) => {
+      const adjustmentsQuery = query(collection(db, 'leaveBalanceAdjustments'))
+
+      return onSnapshot(
+        adjustmentsQuery,
+        (snapshot) => {
+          const adjustments = snapshot.docs
+            .map((docSnapshot) => buildAdjustment(docSnapshot.data(), docSnapshot.id))
+            .sort((a, b) => {
+              const aTime = a.createdAt?.getTime() ?? 0
+              const bTime = b.createdAt?.getTime() ?? 0
+              return bTime - aTime
+            })
+          onData(adjustments)
+        },
+        (error) => {
+          onError?.(
+            error instanceof Error
+              ? error
+              : new Error('Failed to load balance adjustments'),
+          )
+        },
+      )
     },
     subscribeUserAdjustments: (userId, onData, onError) => {
       const sources: Record<string, LeaveBalanceAdjustment[]> = {

@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useUserProfile } from '@/hooks/useUserProfile'
+import { AdminAdjustmentsTab } from '@/pages/admin/AdminAdjustmentsTab'
 import { AdminTeamsTab } from '@/pages/admin/AdminTeamsTab'
 import { AdminUsersTab } from '@/pages/admin/AdminUsersTab'
 
@@ -37,12 +38,16 @@ export function AdminPage() {
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="teams">Teams</TabsTrigger>
+          <TabsTrigger value="adjustments">Balance adjustments</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
           <AdminUsersTab />
         </TabsContent>
         <TabsContent value="teams">
           <AdminTeamsTab />
+        </TabsContent>
+        <TabsContent value="adjustments">
+          <AdminAdjustmentsTab />
         </TabsContent>
       </Tabs>
     </section>
