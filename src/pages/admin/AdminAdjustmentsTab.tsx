@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+import { LoadingState } from '@/components/LoadingState'
 import { useAllLeaveBalanceAdjustments } from '@/hooks/useAllLeaveBalanceAdjustments'
 import { useUsersList } from '@/hooks/useUsersList'
 import { formatDateTime, formatDurationWithDays } from '@/lib/leave'
@@ -69,7 +70,7 @@ export function AdminAdjustmentsTab() {
   }, [adjustments])
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading balance adjustments...</p>
+    return <LoadingState variant="inline" title="Loading balance adjustments..." />
   }
 
   if (error) {

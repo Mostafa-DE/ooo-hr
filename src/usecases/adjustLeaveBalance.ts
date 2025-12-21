@@ -26,7 +26,20 @@ export async function adjustLeaveBalance(
     throw new Error('Adjustment must change the balance.')
   }
 
-  const nextBalance = await context.leaveBalanceRepository.applyAdjustmentWithLog({
+  const currentBalance = await context.leaveBalanceRepository.fetchBalance(
+    input.userId,
+    input.leaveTypeId,
+    input.year,
+  )
+  const nextBalance = (currentBalance?.balanceMinutes ?? 0) + input.deltaMinutes
+
+  if (nextBalance < 0) {
+    throw new Error(
+      'Balance cannot go negative. Record as UNPAID or increase the leave balance.',
+    )
+  }
+
+  const updatedBalance = await context.leaveBalanceRepository.applyAdjustmentWithLog({
     userId: input.userId,
     leaveTypeId: input.leaveTypeId,
     year: input.year,
@@ -37,5 +50,5 @@ export async function adjustLeaveBalance(
     source: 'admin',
   })
 
-  return { balanceMinutes: nextBalance }
+  return { balanceMinutes: updatedBalance }
 }

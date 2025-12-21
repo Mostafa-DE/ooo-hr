@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom'
 
 import { useAuth } from '@/auth/useAuth'
+import { LoadingState } from '@/components/LoadingState'
 import { AccessDeniedPage } from '@/pages/AccessDeniedPage'
 import { Button } from '@/components/ui/button'
 import { canAccessApp, getAccessIssues } from '@/lib/access'
@@ -12,10 +13,10 @@ export function LoginPage() {
 
   if (authLoading || profileLoading) {
     return (
-      <section className="space-y-2">
-        <h1 className="text-2xl font-semibold">Loading…</h1>
-        <p className="text-muted-foreground">Checking your account access.</p>
-      </section>
+      <LoadingState
+        title="Loading..."
+        description="Checking your account access."
+      />
     )
   }
 

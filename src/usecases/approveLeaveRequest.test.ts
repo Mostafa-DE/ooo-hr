@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { approveLeaveRequest } from '@/usecases/approveLeaveRequest'
+import { approveLeaveRequest } from './approveLeaveRequest'
 import type { LeaveRequest } from '@/types/leave'
 import type { Team } from '@/types/team'
 

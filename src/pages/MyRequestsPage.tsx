@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { useAuth } from '@/auth/useAuth'
+import { LoadingState } from '@/components/LoadingState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -133,7 +134,7 @@ export function MyRequestsPage() {
   const getUserLabel = (uid: string) => userLabelById.get(uid) ?? uid
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading requests...</p>
+    return <LoadingState variant="inline" title="Loading requests..." />
   }
 
   if (error) {

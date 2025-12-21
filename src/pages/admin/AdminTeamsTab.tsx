@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 
+import { LoadingState } from '@/components/LoadingState'
 import { Button } from '@/components/ui/button'
 import { useTeamsList } from '@/hooks/useTeamsList'
 import { useUsersList } from '@/hooks/useUsersList'
@@ -254,7 +255,7 @@ export function AdminTeamsTab() {
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading teams...</p>
+    return <LoadingState variant="inline" title="Loading teams..." />
   }
 
   if (error) {

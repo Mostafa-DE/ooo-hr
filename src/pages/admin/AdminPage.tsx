@@ -1,3 +1,4 @@
+import { LoadingState } from '@/components/LoadingState'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import { AdminAdjustmentsTab } from '@/pages/admin/AdminAdjustmentsTab'
@@ -8,7 +9,7 @@ export function AdminPage() {
   const { profile, loading, error } = useUserProfile()
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading admin tools...</p>
+    return <LoadingState variant="inline" title="Loading admin tools..." />
   }
 
   if (error) {

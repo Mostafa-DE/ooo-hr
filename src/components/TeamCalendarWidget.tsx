@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react'
 
+import { LoadingState } from '@/components/LoadingState'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTeamCalendar } from '@/hooks/useTeamCalendar'
@@ -61,7 +62,7 @@ export function TeamCalendarWidget({
 
   const statusMessage = (emptyText: string) => {
     if (loading) {
-      return <p className="text-sm text-muted-foreground">Loading team leaves...</p>
+      return <LoadingState variant="inline" title="Loading team leaves..." />
     }
 
     if (error) {

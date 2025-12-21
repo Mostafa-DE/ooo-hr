@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { LoadingState } from '@/components/LoadingState'
 import { useTeamRequests } from '@/hooks/useTeamRequests'
 import { useTeam } from '@/hooks/useTeam'
 import { useUserProfile } from '@/hooks/useUserProfile'
@@ -229,7 +230,7 @@ export function ApprovalsPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading approvals...</p>
+    return <LoadingState variant="inline" title="Loading approvals..." />
   }
 
   if (error) {

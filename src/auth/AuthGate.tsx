@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom'
 
 import { useAuth } from '@/auth/useAuth'
+import { LoadingState } from '@/components/LoadingState'
 import { AccessDeniedPage } from '@/pages/AccessDeniedPage'
 import { canAccessApp, getAccessIssues } from '@/lib/access'
 import { useUserProfile } from '@/hooks/useUserProfile'
@@ -11,10 +12,10 @@ export function AuthGate() {
 
   if (authLoading || profileLoading) {
     return (
-      <section className="space-y-2">
-        <h1 className="text-2xl font-semibold">Loading…</h1>
-        <p className="text-muted-foreground">Preparing your workspace.</p>
-      </section>
+      <LoadingState
+        title="Loading..."
+        description="Preparing your workspace."
+      />
     )
   }
 

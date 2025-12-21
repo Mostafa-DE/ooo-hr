@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,6 +39,16 @@ function formatTimestamp(value?: { toDate: () => Date }) {
   }
 
   return value.toDate().toLocaleString();
+}
+
+function formatDeltaPreview(value: number) {
+  if (value === 0) {
+    return "0m";
+  }
+
+  const absValue = Math.abs(value);
+  const label = formatDurationWithDays(absValue);
+  return value < 0 ? `-${label}` : label;
 }
 
 function formatLeaveTypeLabel(value: string) {
@@ -441,7 +452,7 @@ export function AdminUsersTab() {
   }, [balanceType, balanceUser, balanceYear, balances]);
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading users...</p>;
+    return <LoadingState variant="inline" title="Loading users..." />;
   }
 
   if (error) {
@@ -673,8 +684,24 @@ export function AdminUsersTab() {
                   Warning: This user has balances older than two years.
                 </div>
               ) : null}
-              <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-xl border bg-card/60 p-4 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Balance context</div>
+                    <div className="text-xs text-muted-foreground">
+                      Choose the leave type and year you want to adjust.
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleCarryover}
+                    disabled={carrying}
+                  >
+                    {carrying ? "Carrying..." : `Carry from ${balanceYear - 1}`}
+                  </Button>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1">
                     Leave type
                     <select
@@ -707,17 +734,9 @@ export function AdminUsersTab() {
                       }
                     />
                   </label>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleCarryover}
-                    disabled={carrying}
-                  >
-                    {carrying ? "Carrying..." : `Carry from ${balanceYear - 1}`}
-                  </Button>
                 </div>
-                <div className="text-sm">
-                  Current balance:{" "}
+                <div className="mt-3 flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2">
+                  <span className="text-muted-foreground">Current balance</span>
                   <span className="font-semibold">
                     {formatBalance(selectedBalance?.balanceMinutes)}
                   </span>
@@ -737,7 +756,7 @@ export function AdminUsersTab() {
                     <span className="text-xs text-muted-foreground">
                       {Number.isNaN(Number.parseInt(deltaMinutes, 10)) || deltaMinutes.trim() === ""
                         ? "Preview: —"
-                        : `Preview: ${formatDurationWithDays(Number.parseInt(deltaMinutes, 10))}`}
+                        : `Preview: ${formatDeltaPreview(Number.parseInt(deltaMinutes, 10))}`}
                     </span>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
