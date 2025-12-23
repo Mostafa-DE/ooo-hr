@@ -30,6 +30,7 @@ type UpdateUserAdminInput = {
 type UserRepository = {
   upsertUserOnLogin: (input: CreateUserInput) => Promise<void>
   updateUserAdmin: (input: UpdateUserAdminInput) => Promise<void>
+  updateUserJoinDate: (input: { uid: string; joinDate: Date }) => Promise<void>
   fetchUsersByIds: (uids: string[]) => Promise<UserProfile[]>
   subscribeUsers: (
     onData: (users: UserProfile[]) => void,
@@ -70,6 +71,7 @@ function buildUserProfile(
     isWhitelisted: record?.isWhitelisted === true,
     role,
     teamId: typeof record?.teamId === 'string' ? record.teamId : null,
+    joinDate: readTimestamp(record?.joinDate),
     createdAt: readTimestamp(record?.createdAt),
     lastLoginAt: readTimestamp(record?.lastLoginAt),
   }
@@ -117,6 +119,13 @@ export function createUserRepository(db: Firestore): UserRepository {
         isWhitelisted: input.isWhitelisted,
         role: input.role,
         teamId: input.teamId,
+      })
+    },
+    updateUserJoinDate: async (input) => {
+      const ref = doc(db, 'users', input.uid)
+
+      await updateDoc(ref, {
+        joinDate: Timestamp.fromDate(input.joinDate),
       })
     },
     fetchUsersByIds: async (uids) => {

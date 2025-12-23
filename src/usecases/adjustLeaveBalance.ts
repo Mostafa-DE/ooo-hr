@@ -12,6 +12,7 @@ type AdjustLeaveBalanceInput = {
   reason: string
   reference: string | null
   actorUid: string
+  joinDate?: Date
 }
 
 export async function adjustLeaveBalance(
@@ -24,6 +25,10 @@ export async function adjustLeaveBalance(
 
   if (input.deltaMinutes === 0) {
     throw new Error('Adjustment must change the balance.')
+  }
+
+  if (!input.joinDate) {
+    throw new Error('Join date must be set before adjusting balances.')
   }
 
   const currentBalance = await context.leaveBalanceRepository.fetchBalance(

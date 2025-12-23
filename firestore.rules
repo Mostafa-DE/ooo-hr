@@ -30,6 +30,20 @@ service cloud.firestore {
       return isWhitelisted() && userData().role == 'manager';
     }
 
+    function hasJoinDate(data) {
+      return data.keys().hasAny(['joinDate']);
+    }
+
+    function joinDateValid() {
+      return !hasJoinDate(request.resource.data)
+        || request.resource.data.joinDate is timestamp;
+    }
+
+    function joinDateUnchanged() {
+      return !hasJoinDate(resource.data)
+        || request.resource.data.joinDate == resource.data.joinDate;
+    }
+
     function sameTeam(teamId) {
       return isWhitelisted() && userData().teamId == teamId;
     }
@@ -53,7 +67,7 @@ service cloud.firestore {
         && request.resource.data.role == 'employee'
         && request.resource.data.isWhitelisted == false
         && request.resource.data.teamId == null;
-      allow update: if isAdmin();
+      allow update: if isAdmin() && joinDateValid() && joinDateUnchanged();
       allow update: if isSignedIn()
         && request.auth.uid == userId
         && request.resource.data.diff(resource.data).changedKeys()

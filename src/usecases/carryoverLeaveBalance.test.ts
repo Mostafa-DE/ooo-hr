@@ -3,6 +3,26 @@ import { describe, expect, it, vi } from 'vitest'
 import { carryoverLeaveBalance } from '@/usecases/carryoverLeaveBalance'
 
 describe('carryoverLeaveBalance', () => {
+  it('blocks carryover without join month', async () => {
+    const leaveBalanceRepository = {
+      fetchBalance: vi.fn(),
+      applyAdjustmentWithLog: vi.fn(),
+    }
+
+    await expect(
+      carryoverLeaveBalance(
+        { leaveBalanceRepository },
+        {
+          userId: 'user-1',
+          leaveTypeId: 'annual',
+          fromYear: 2025,
+          toYear: 2026,
+          actorUid: 'admin-1',
+        },
+      ),
+    ).rejects.toThrow('Join date must be set before adjusting balances.')
+  })
+
   it('does nothing when no source balance exists', async () => {
     const leaveBalanceRepository = {
       fetchBalance: vi.fn().mockResolvedValue(null),
@@ -17,6 +37,7 @@ describe('carryoverLeaveBalance', () => {
         fromYear: 2025,
         toYear: 2026,
         actorUid: 'admin-1',
+        joinDate: new Date('2025-06-01'),
       },
     )
 
@@ -44,6 +65,7 @@ describe('carryoverLeaveBalance', () => {
         fromYear: 2025,
         toYear: 2026,
         actorUid: 'admin-1',
+        joinDate: new Date('2025-06-01'),
       },
     )
 
@@ -69,6 +91,7 @@ describe('carryoverLeaveBalance', () => {
         fromYear: 2025,
         toYear: 2026,
         actorUid: 'admin-1',
+        joinDate: new Date('2025-06-01'),
       },
     )
 

@@ -29,6 +29,7 @@ import type { UserProfile, UserRole } from "@/types/user";
 import type { LeaveType } from "@/types/leave";
 import { adjustLeaveBalance } from "@/usecases/adjustLeaveBalance";
 import { carryoverLeaveBalance } from "@/usecases/carryoverLeaveBalance";
+import { setJoinDate } from "@/usecases/setJoinDate";
 
 const roleOptions: UserRole[] = ["employee", "team_lead", "manager", "admin"];
 const leaveTypeOptions: LeaveType[] = ["annual", "sick", "unpaid", "other"];
@@ -39,6 +40,17 @@ function formatTimestamp(value?: { toDate: () => Date }) {
   }
 
   return value.toDate().toLocaleString();
+}
+
+function formatDateInput(value?: Date) {
+  if (!value) {
+    return "";
+  }
+
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatDeltaPreview(value: number) {
@@ -319,6 +331,8 @@ export function AdminUsersTab() {
   const [reference, setReference] = useState("");
   const [adjusting, setAdjusting] = useState(false);
   const [carrying, setCarrying] = useState(false);
+  const [joinDateDraft, setJoinDateDraft] = useState("");
+  const [settingJoinDate, setSettingJoinDate] = useState(false);
 
   const { balances } = useLeaveBalances(balanceUser?.uid ?? null);
   const { adjustments } = useLeaveBalanceAdjustments(
@@ -358,6 +372,27 @@ export function AdminUsersTab() {
   const teamsById = useMemo(() => {
     return new Map(teams.map((team) => [team.id, team]));
   }, [teams]);
+
+  useEffect(() => {
+    if (!balanceUser) {
+      return;
+    }
+
+    const latest = users.find((userProfile) => userProfile.uid === balanceUser.uid);
+    if (latest && latest !== balanceUser) {
+      setBalanceUser(latest);
+    }
+  }, [balanceUser, users]);
+
+  useEffect(() => {
+    if (!balanceUser) {
+      return;
+    }
+
+    setJoinDateDraft(
+      balanceUser.joinDate ? formatDateInput(balanceUser.joinDate.toDate()) : ""
+    );
+  }, [balanceUser]);
 
   const updateTeamAssignments = async ({
     previousTeamId,
@@ -519,6 +554,9 @@ export function AdminUsersTab() {
     setDeltaMinutes("");
     setReason("");
     setReference("");
+    setJoinDateDraft(
+      user.joinDate ? formatDateInput(user.joinDate.toDate()) : ""
+    );
   };
 
   const handleOpenAdjustments = (user: UserProfile) => {
@@ -539,8 +577,21 @@ export function AdminUsersTab() {
     });
   };
 
+  const joinDateLabel = balanceUser?.joinDate
+    ? balanceUser.joinDate.toDate().toLocaleDateString()
+    : "—";
+  const joinDateMissing = balanceUser ? !balanceUser.joinDate : false;
+
   const handleAdjustBalance = async () => {
     if (!balanceUser || !leaveBalanceRepository) {
+      return;
+    }
+
+    if (!balanceUser.joinDate) {
+      toast.push({
+        title: "Join date required",
+        description: "Set join date before adjusting balances.",
+      });
       return;
     }
 
@@ -565,6 +616,7 @@ export function AdminUsersTab() {
           reason,
           reference: reference.trim() ? reference.trim() : null,
           actorUid: adminUser.uid,
+          joinDate: balanceUser.joinDate.toDate(),
         }
       );
       toast.push({
@@ -588,6 +640,14 @@ export function AdminUsersTab() {
       return;
     }
 
+    if (!balanceUser.joinDate) {
+      toast.push({
+        title: "Join date required",
+        description: "Set join date before adjusting balances.",
+      });
+      return;
+    }
+
     setCarrying(true);
     try {
       const result = await carryoverLeaveBalance(
@@ -598,6 +658,7 @@ export function AdminUsersTab() {
           fromYear: balanceYear - 1,
           toYear: balanceYear,
           actorUid: adminUser.uid,
+          joinDate: balanceUser.joinDate.toDate(),
         }
       );
       if (result.carried) {
@@ -617,6 +678,58 @@ export function AdminUsersTab() {
       toast.push({ title: "Carryover blocked", description: message });
     } finally {
       setCarrying(false);
+    }
+  };
+
+  const handleSetJoinDate = async () => {
+    if (!balanceUser || !userRepository) {
+      return;
+    }
+
+    if (!joinDateDraft.trim()) {
+      toast.push({
+        title: "Join date required",
+        description: "Select a join date before saving.",
+      });
+      return;
+    }
+
+    const parsedJoinDate = new Date(`${joinDateDraft}T00:00:00`);
+    if (Number.isNaN(parsedJoinDate.getTime())) {
+      toast.push({
+        title: "Join date required",
+        description: "Select a valid join date before saving.",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Join date can only be set once. It cannot be changed later. Continue?"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSettingJoinDate(true);
+    try {
+      await setJoinDate(
+        { userRepository },
+        {
+          uid: balanceUser.uid,
+          joinDate: parsedJoinDate,
+          currentJoinDate: balanceUser.joinDate?.toDate() ?? null,
+        }
+      );
+      toast.push({
+        title: "Join date saved",
+        description: "Join date is now locked for this user.",
+      });
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Unable to save join date.";
+      toast.push({ title: "Join date blocked", description: message });
+    } finally {
+      setSettingJoinDate(false);
     }
   };
 
@@ -679,6 +792,11 @@ export function AdminUsersTab() {
                   Review yearly balances and add adjustments.
                 </DialogDescription>
               </DialogHeader>
+              {joinDateMissing ? (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                  Join date must be set before adjusting balances.
+                </div>
+              ) : null}
               {hasStaleBalance ? (
                 <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
                   Warning: This user has balances older than two years.
@@ -696,7 +814,7 @@ export function AdminUsersTab() {
                     size="sm"
                     variant="secondary"
                     onClick={handleCarryover}
-                    disabled={carrying}
+                    disabled={carrying || joinDateMissing}
                   >
                     {carrying ? "Carrying..." : `Carry from ${balanceYear - 1}`}
                   </Button>
@@ -734,6 +852,32 @@ export function AdminUsersTab() {
                       }
                     />
                   </label>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                  <label className="flex flex-col gap-1 text-sm">
+                    Join date
+                    {balanceUser.joinDate ? (
+                      <Input value={joinDateLabel} readOnly />
+                    ) : (
+                      <Input
+                        type="date"
+                        value={joinDateDraft}
+                        onChange={(event) => setJoinDateDraft(event.target.value)}
+                      />
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      Join date is permanent once saved.
+                    </span>
+                  </label>
+                  {!balanceUser.joinDate ? (
+                    <Button
+                      size="sm"
+                      onClick={handleSetJoinDate}
+                      disabled={settingJoinDate}
+                    >
+                      {settingJoinDate ? "Saving..." : "Set join date"}
+                    </Button>
+                  ) : null}
                 </div>
                 <div className="mt-3 flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2">
                   <span className="text-muted-foreground">Current balance</span>
@@ -812,7 +956,10 @@ export function AdminUsersTab() {
               </div>
               </div>
               <DialogFooter className="border-t bg-card pt-4">
-                <Button onClick={handleAdjustBalance} disabled={adjusting}>
+                <Button
+                  onClick={handleAdjustBalance}
+                  disabled={adjusting || joinDateMissing}
+                >
                   {adjusting ? "Saving..." : "Save adjustment"}
                 </Button>
                 <Button

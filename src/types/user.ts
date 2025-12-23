@@ -10,6 +10,7 @@ type UserProfile = {
   isWhitelisted: boolean
   role: UserRole
   teamId: string | null
+  joinDate?: Timestamp
   createdAt?: Timestamp
   lastLoginAt?: Timestamp
 }

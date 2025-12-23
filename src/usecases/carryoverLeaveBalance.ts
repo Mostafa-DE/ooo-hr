@@ -10,6 +10,7 @@ type CarryoverLeaveBalanceInput = {
   fromYear: number
   toYear: number
   actorUid: string
+  joinDate?: Date
 }
 
 export async function carryoverLeaveBalance(
@@ -18,6 +19,10 @@ export async function carryoverLeaveBalance(
 ) {
   if (input.fromYear === input.toYear) {
     throw new Error('Carryover must target a different year.')
+  }
+
+  if (!input.joinDate) {
+    throw new Error('Join date must be set before adjusting balances.')
   }
 
   const sourceBalance = await context.leaveBalanceRepository.fetchBalance(

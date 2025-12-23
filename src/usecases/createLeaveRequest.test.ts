@@ -237,4 +237,5 @@ describe('createLeaveRequest', () => {
       ),
     ).rejects.toThrow('Insufficient leave balance.')
   })
+
 })
