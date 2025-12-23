@@ -31,7 +31,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6 sm:py-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
             <Link to="/" className="shrink-0">
               <img src="/ooo.png" alt="OOO" className="h-10 w-10" />
@@ -81,13 +81,13 @@ export function AppShell() {
                   {displayName.charAt(0)}
                 </div>
               )}
-              <div className="hidden sm:flex sm:flex-col">
+              <div className="flex flex-col">
                 <span className="text-sm font-medium">
-                  {displayName}
+                  <span className="hidden sm:inline">{displayName}</span>
                   {role ? (
                     <span
                       className={cn(
-                        'ml-2 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide',
+                        'ml-0 sm:ml-2 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide',
                         roleClassName,
                       )}
                     >
@@ -95,7 +95,7 @@ export function AppShell() {
                     </span>
                   ) : null}
                 </span>
-                <span className="text-xs text-muted-foreground">{email}</span>
+                <span className="hidden sm:block text-xs text-muted-foreground">{email}</span>
               </div>
             </div>
             <button
@@ -107,7 +107,7 @@ export function AppShell() {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl px-6 py-10">
+      <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         <Outlet />
       </main>
     </div>

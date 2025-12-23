@@ -595,7 +595,7 @@ export function ApprovalsPage() {
                       userId={request.employeeUid}
                       summaryByUser={usageSummaryByUser}
                     />
-                    <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                    <div className="mt-4 space-y-2">
                       <Input
                         placeholder="Optional rejection reason"
                         value={reasonByRequest[request.id] ?? ""}
@@ -606,37 +606,41 @@ export function ApprovalsPage() {
                           }))
                         }
                       />
-                      <Button
-                        variant="secondary"
-                        onClick={() => handleReject(request)}
-                        disabled={
-                          actingId === request.id ||
-                          !canReject(
-                            request,
-                            user.uid,
-                            teamLeadUid,
-                            managerUid,
-                            isAdmin
-                          )
-                        }
-                      >
-                        Reject
-                      </Button>
-                      <Button
-                        onClick={() => handleApprove(request)}
-                        disabled={
-                          actingId === request.id ||
-                          !canApprove(
-                            request,
-                            user.uid,
-                            teamLeadUid,
-                            managerUid,
-                            isAdmin
-                          )
-                        }
-                      >
-                        Approve
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          className="flex-1 sm:flex-none"
+                          onClick={() => handleReject(request)}
+                          disabled={
+                            actingId === request.id ||
+                            !canReject(
+                              request,
+                              user.uid,
+                              teamLeadUid,
+                              managerUid,
+                              isAdmin
+                            )
+                          }
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          className="flex-1 sm:flex-none"
+                          onClick={() => handleApprove(request)}
+                          disabled={
+                            actingId === request.id ||
+                            !canApprove(
+                              request,
+                              user.uid,
+                              teamLeadUid,
+                              managerUid,
+                              isAdmin
+                            )
+                          }
+                        >
+                          Approve
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );
