@@ -16,6 +16,22 @@ describe('setJoinDate', () => {
     ).rejects.toThrow('Join date must be a valid date.')
   })
 
+  it('blocks future join dates', async () => {
+    const userRepository = {
+      updateUserJoinDate: vi.fn(),
+    }
+
+    const futureDate = new Date()
+    futureDate.setFullYear(futureDate.getFullYear() + 1)
+
+    await expect(
+      setJoinDate(
+        { userRepository },
+        { uid: 'user-1', joinDate: futureDate },
+      ),
+    ).rejects.toThrow('Join date cannot be in the future.')
+  })
+
   it('blocks changes once join date is set', async () => {
     const userRepository = {
       updateUserJoinDate: vi.fn(),

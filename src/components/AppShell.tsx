@@ -32,14 +32,14 @@ export function AppShell() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-            <div className="text-lg font-semibold tracking-tight">OOO</div>
-            <nav className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <div className="shrink-0 text-lg font-semibold tracking-tight">OOO</div>
+            <nav className="-mx-2 flex items-center gap-1 overflow-x-auto px-2 sm:mx-0 sm:flex-wrap sm:px-0">
               {navigationItems
                 .filter((item) => (item.to === '/admin' ? isAdmin : true))
                 .filter((item) => (item.to === '/approvals' ? canSeeApprovals : true))
                 .filter((item) =>
-                  isAdmin && (item.to === '/request' || item.to === '/my-requests') ? false : true,
+                  isAdmin && (item.to === '/my-requests' || item.to === '/my-balances') ? false : true,
                 )
                 .map((item) => (
                 <NavLink
@@ -48,7 +48,7 @@ export function AppShell() {
                   className={({ isActive }) =>
                     cn(
                       buttonVariants({ variant: 'ghost', size: 'sm' }),
-                      'text-sm',
+                      'shrink-0 text-sm',
                       isActive && 'bg-accent text-accent-foreground',
                     )
                   }

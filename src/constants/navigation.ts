@@ -11,14 +11,14 @@ export const navigationItems = [
     description: 'Team schedule and highlights',
   },
   {
-    label: 'Request Leave',
-    to: '/request',
-    description: 'Create a new leave request',
-  },
-  {
     label: 'My Requests',
     to: '/my-requests',
     description: 'Your leave requests and status',
+  },
+  {
+    label: 'My Balances',
+    to: '/my-balances',
+    description: 'Your leave balance history',
   },
   {
     label: 'Approvals',

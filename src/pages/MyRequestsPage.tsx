@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '@/auth/useAuth'
 import { LoadingState } from '@/components/LoadingState'
@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/table'
 import { useLeaveLogs } from '@/hooks/useLeaveLogs'
 import { useLeaveRequests } from '@/hooks/useLeaveRequests'
-import { useLeaveBalanceAdjustments } from '@/hooks/useLeaveBalanceAdjustments'
 import { useToast } from '@/hooks/useToast'
 import { useUsersList } from '@/hooks/useUsersList'
 import { useUserProfile } from '@/hooks/useUserProfile'
@@ -45,62 +44,63 @@ export function MyRequestsPage() {
   const toast = useToast()
   const { profile } = useUserProfile()
   const { requests, loading, error } = useLeaveRequests(user?.uid ?? null)
-  const { adjustments } = useLeaveBalanceAdjustments(user?.uid ?? null)
   const [selected, setSelected] = useState<LeaveRequest | null>(null)
   const { logs } = useLeaveLogs(selected?.id ?? null)
   const { users } = useUsersList()
   const [cancelling, setCancelling] = useState(false)
 
-  const sortedRequests = useMemo(() => requests, [requests])
+  // Filter state for requests table
+  const [requestFilterStatus, setRequestFilterStatus] = useState<string | 'all'>('all')
+  const [requestFilterType, setRequestFilterType] = useState<string | 'all'>('all')
+
+  // Pagination state for requests table
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
+  // Extract available filter options for requests
+  const availableStatuses = useMemo(() => {
+    const statuses = new Set<string>()
+    requests.forEach((req) => statuses.add(req.status))
+    return Array.from(statuses).sort()
+  }, [requests])
+
+  const availableRequestTypes = useMemo(() => {
+    const types = new Set<string>()
+    requests.forEach((req) => types.add(req.type))
+    return Array.from(types).sort()
+  }, [requests])
+
+  // Apply filters to requests
+  const filteredRequests = useMemo(() => {
+    return requests.filter((request) => {
+      if (requestFilterStatus !== 'all' && request.status !== requestFilterStatus) {
+        return false
+      }
+      if (requestFilterType !== 'all' && request.type !== requestFilterType) {
+        return false
+      }
+      return true
+    })
+  }, [requests, requestFilterStatus, requestFilterType])
+
+  const sortedRequests = useMemo(() => filteredRequests, [filteredRequests])
+
+  // Calculate pagination
+  const totalPages = Math.ceil(sortedRequests.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedRequests = sortedRequests.slice(startIndex, endIndex)
+
+  // Reset to page 1 when current page exceeds total pages
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1)
+    }
+  }, [currentPage, totalPages])
+
   const userLabelById = useMemo(() => {
     return new Map(users.map((profile) => [profile.uid, profile.displayName]))
   }, [users])
-
-  const formatAdjustmentDelta = (minutes: number) => {
-    const label = formatDurationWithDays(Math.abs(minutes))
-    return minutes >= 0 ? `+${label}` : `-${label}`
-  }
-
-  const formatAdjustmentActor = (uid: string) => {
-    if (user && uid === user.uid) {
-      return 'You'
-    }
-    return 'Admin'
-  }
-
-  const formatLeaveTypeLabel = (value: string) =>
-    value.charAt(0).toUpperCase() + value.slice(1).replace('_', ' ')
-
-  const groupedAdjustments = useMemo(() => {
-    const grouped = new Map<string, typeof adjustments>()
-    adjustments.forEach((adjustment) => {
-      const existing = grouped.get(adjustment.leaveTypeId)
-      if (existing) {
-        existing.push(adjustment)
-      } else {
-        grouped.set(adjustment.leaveTypeId, [adjustment])
-      }
-    })
-
-    return Array.from(grouped.entries())
-      .map(([leaveType, items]) => {
-        const yearMap = new Map<number, typeof items>()
-        items.forEach((item) => {
-          const existing = yearMap.get(item.year)
-          if (existing) {
-            existing.push(item)
-          } else {
-            yearMap.set(item.year, [item])
-          }
-        })
-        const years = Array.from(yearMap.entries())
-          .map(([year, yearItems]) => ({ year, items: yearItems }))
-          .sort((a, b) => b.year - a.year)
-
-        return { leaveType, years }
-      })
-      .sort((a, b) => a.leaveType.localeCompare(b.leaveType))
-  }, [adjustments])
 
   const handleCancel = async (request: LeaveRequest) => {
     if (!user || !leaveRequestRepository) {
@@ -149,6 +149,78 @@ export function MyRequestsPage() {
           Track your submitted leave requests and their status.
         </p>
       </div>
+
+      {/* Filters for requests table */}
+      {requests.length > 0 && (availableStatuses.length > 1 || availableRequestTypes.length > 1) && (
+        <div className="rounded-lg border bg-card p-4">
+          <div className="space-y-3">
+            {/* Status filter */}
+            {availableStatuses.length > 1 && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-muted-foreground">Status</div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={requestFilterStatus === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setRequestFilterStatus('all')
+                      setCurrentPage(1)
+                    }}
+                  >
+                    All
+                  </Button>
+                  {availableStatuses.map((status) => (
+                    <Button
+                      key={status}
+                      variant={requestFilterStatus === status ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setRequestFilterStatus(status)
+                        setCurrentPage(1)
+                      }}
+                    >
+                      {statusLabels[status] ?? status}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Type filter */}
+            {availableRequestTypes.length > 1 && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-muted-foreground">Type</div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={requestFilterType === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setRequestFilterType('all')
+                      setCurrentPage(1)
+                    }}
+                  >
+                    All
+                  </Button>
+                  {availableRequestTypes.map((type) => (
+                    <Button
+                      key={type}
+                      variant={requestFilterType === type ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setRequestFilterType(type)
+                        setCurrentPage(1)
+                      }}
+                    >
+                      {type.replace('_', ' ')}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
@@ -164,11 +236,13 @@ export function MyRequestsPage() {
             {sortedRequests.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                  No requests yet.
+                  {requests.length === 0
+                    ? 'No requests yet.'
+                    : 'No requests match the selected filters.'}
                 </TableCell>
               </TableRow>
             ) : (
-              sortedRequests.map((request) => (
+              paginatedRequests.map((request) => (
                 <TableRow
                   key={request.id}
                   className="cursor-pointer"
@@ -179,7 +253,7 @@ export function MyRequestsPage() {
                   </TableCell>
                   <TableCell>{formatDateTime(request.startAt)}</TableCell>
                   <TableCell>{formatDateTime(request.endAt)}</TableCell>
-                  <TableCell>{formatDuration(request.requestedMinutes)}</TableCell>
+                  <TableCell>{formatDurationWithDays(request.requestedMinutes)}</TableCell>
                   <TableCell>
                     <Badge variant={request.status === 'SUBMITTED' ? 'default' : 'outline'}>
                       {statusLabels[request.status] ?? request.status}
@@ -190,62 +264,67 @@ export function MyRequestsPage() {
             )}
           </TableBody>
         </Table>
-      </div>
-      <div className="rounded-lg border bg-card p-4 text-card-foreground">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold">Balance adjustments</h2>
-          <p className="text-xs text-muted-foreground">
-            Latest updates to your leave balance.
-          </p>
-        </div>
-        <div className="mt-4 space-y-3">
-          {groupedAdjustments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No balance adjustments yet.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {groupedAdjustments.map((group) => (
-                <div key={group.leaveType} className="rounded-md border bg-muted/20 p-3">
-                  <div className="text-sm font-semibold">
-                    {formatLeaveTypeLabel(group.leaveType)} ·{' '}
-                    {group.years.reduce((sum, yearGroup) => sum + yearGroup.items.length, 0)}
-                  </div>
-                  <div className="mt-3 space-y-4">
-                    {group.years.map((yearGroup) => (
-                      <div key={`${group.leaveType}-${yearGroup.year}`}>
-                        <div className="text-xs font-semibold text-muted-foreground">
-                          Year {yearGroup.year}
-                        </div>
-                        <div className="mt-2 space-y-3">
-                          {yearGroup.items.map((adjustment) => (
-                            <div
-                              key={adjustment.id}
-                              className="rounded-md border bg-background p-3 text-sm"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2 font-semibold">
-                                <span>
-                                  {adjustment.createdAt
-                                    ? formatDateTime(adjustment.createdAt)
-                                    : '—'}{' '}
-                                  · {formatAdjustmentActor(adjustment.actorUid)}
-                                </span>
-                                <span>{formatAdjustmentDelta(adjustment.deltaMinutes)}</span>
-                              </div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                Reason: {adjustment.reason || '—'}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+
+        {/* Pagination Controls */}
+        {sortedRequests.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1}-{Math.min(endIndex, sortedRequests.length)} of{' '}
+              {sortedRequests.length} requests
             </div>
-          )}
-        </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  // Show first page, last page, current page, and pages around current
+                  const showPage =
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+
+                  if (!showPage) {
+                    // Show ellipsis once between gaps
+                    if (page === currentPage - 2 || page === currentPage + 2) {
+                      return (
+                        <span key={page} className="px-2 text-sm text-muted-foreground">
+                          ...
+                        </span>
+                      )
+                    }
+                    return null
+                  }
+
+                  return (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="min-w-[2.5rem]"
+                    >
+                      {page}
+                    </Button>
+                  )
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>

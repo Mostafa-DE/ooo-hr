@@ -135,7 +135,8 @@ service cloud.firestore {
         && request.resource.data.actorUid == request.auth.uid
         && (isAdmin()
           || ((isTeamLead() || isManager())
-            && teamForUser(request.resource.data.userId) == userData().teamId));
+            && teamForUser(request.resource.data.userId) == userData().teamId))
+        && get(/databases/$(database)/documents/users/$(request.resource.data.userId)).data.joinDate != null;
       allow update, delete: if false;
     }
   }

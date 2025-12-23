@@ -55,15 +55,29 @@ export function formatDurationWithDays(
 
   const days = Math.floor(safeMinutes / dailyMinutes)
   const remainder = safeMinutes % dailyMinutes
+  const halfDay = dailyMinutes / 2
 
+  // Full days only
   if (days > 0 && remainder === 0) {
     return days === 1 ? '1d' : `${days}d`
   }
 
+  // Full days + half day
+  if (days > 0 && remainder === halfDay) {
+    return `${days}.5d`
+  }
+
+  // Full days + partial (not half)
   if (days > 0) {
     return `${days}d ${formatDuration(remainder)}`
   }
 
+  // Exactly half a day (4h when dailyMinutes=480)
+  if (safeMinutes === halfDay) {
+    return '0.5d'
+  }
+
+  // Less than half a day or odd duration
   return formatDuration(remainder)
 }
 

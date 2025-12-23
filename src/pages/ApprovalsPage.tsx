@@ -18,7 +18,6 @@ import { useLeaveBalances } from "@/hooks/useLeaveBalances";
 import { calculateAccrualReference } from "@/lib/accrual";
 import {
   formatDateTime,
-  formatDuration,
   formatDurationWithDays,
 } from "@/lib/leave";
 import { useRepositories } from "@/lib/useRepositories";
@@ -171,7 +170,7 @@ function UsageSummaryPanel({ userId, summaryByUser }: UsageSummaryPanelProps) {
   if (!summary) {
     return (
       <div className="mt-3 rounded-lg border bg-muted/10 p-3 text-xs text-muted-foreground">
-        Usage summary (current year): no approved leave yet.
+        No leave used this year.
       </div>
     );
   }
@@ -179,16 +178,14 @@ function UsageSummaryPanel({ userId, summaryByUser }: UsageSummaryPanelProps) {
   return (
     <div className="mt-3 rounded-lg border bg-muted/10 p-3 text-xs text-muted-foreground">
       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Usage summary (current year)
+        Leave used this year
       </div>
       <div className="mt-2 grid gap-1 sm:grid-cols-2">
         {LEAVE_TYPES.map((type) => {
           const totals = summary[type];
           return (
             <div key={type}>
-              {type.replace("_", " ")}: {totals.count} request
-              {totals.count === 1 ? "" : "s"} ·{" "}
-              {formatDurationWithDays(totals.minutes)}
+              {type.replace("_", " ")}: {formatDurationWithDays(totals.minutes)}
             </div>
           );
         })}
@@ -330,6 +327,7 @@ export function ApprovalsPage() {
     Record<string, string>
   >({});
   const [actingId, setActingId] = useState<string | null>(null);
+  const [historyFilterUser, setHistoryFilterUser] = useState<string | 'all'>('all');
 
   const usersById = useMemo(() => {
     return new Map(
@@ -397,6 +395,28 @@ export function ApprovalsPage() {
     const pendingIds = new Set(pendingRequests.map((request) => request.id));
     return requests.filter((request) => !pendingIds.has(request.id));
   }, [pendingRequests, requests]);
+
+  // Extract unique users from history requests for filter
+  const historyUsers = useMemo(() => {
+    const uniqueUserIds = new Set<string>();
+    historyRequests.forEach((request) => {
+      uniqueUserIds.add(request.employeeUid);
+    });
+    return Array.from(uniqueUserIds)
+      .map((uid) => ({
+        uid,
+        name: usersById.get(uid) ?? uid,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [historyRequests, usersById]);
+
+  // Filter history requests by selected user
+  const filteredHistoryRequests = useMemo(() => {
+    if (historyFilterUser === 'all') {
+      return historyRequests;
+    }
+    return historyRequests.filter((request) => request.employeeUid === historyFilterUser);
+  }, [historyRequests, historyFilterUser]);
 
   const handleApprove = async (request: LeaveRequest) => {
     if (!user || !leaveRequestRepository) {
@@ -556,7 +576,7 @@ export function ApprovalsPage() {
                         </div>
                         <div className="text-base font-semibold">
                           {request.type.replace("_", " ")} ·{" "}
-                          {formatDuration(request.requestedMinutes)}
+                          {formatDurationWithDays(request.requestedMinutes)}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {formatDateTime(request.startAt)} →{" "}
@@ -625,11 +645,46 @@ export function ApprovalsPage() {
           </div>
         </TabsContent>
         <TabsContent value="history">
+          {/* User Filter */}
+          {historyRequests.length > 0 && historyUsers.length > 1 && (
+            <div className="mb-4 space-y-1.5">
+              <div className="text-xs font-medium text-muted-foreground">Filter by user</div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={historyFilterUser === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setHistoryFilterUser('all')}
+                >
+                  All ({historyRequests.length})
+                </Button>
+                {historyUsers.map((historyUser) => {
+                  const userRequestCount = historyRequests.filter(
+                    (req) => req.employeeUid === historyUser.uid
+                  ).length;
+                  return (
+                    <Button
+                      key={historyUser.uid}
+                      variant={historyFilterUser === historyUser.uid ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setHistoryFilterUser(historyUser.uid)}
+                    >
+                      {historyUser.name} ({userRequestCount})
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-4">
-            {historyRequests.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No history yet.</p>
+            {filteredHistoryRequests.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {historyRequests.length === 0
+                  ? 'No history yet.'
+                  : 'No requests match the selected user.'}
+              </p>
             ) : (
-              historyRequests.map((request) => (
+              filteredHistoryRequests.map((request) => (
                 <div key={request.id} className="rounded-lg border p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -645,7 +700,7 @@ export function ApprovalsPage() {
                       </div>
                       <div className="text-base font-semibold">
                         {request.type.replace("_", " ")} ·{" "}
-                        {formatDuration(request.requestedMinutes)}
+                        {formatDurationWithDays(request.requestedMinutes)}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {formatDateTime(request.startAt)} →{" "}
@@ -671,10 +726,6 @@ export function ApprovalsPage() {
                       </Button>
                     </div>
                   ) : null}
-                  <UsageSummaryPanel
-                    userId={request.employeeUid}
-                    summaryByUser={usageSummaryByUser}
-                  />
                   {(request.step1 || request.step2) && (
                     <div className="mt-3 text-xs text-muted-foreground">
                       {request.step1

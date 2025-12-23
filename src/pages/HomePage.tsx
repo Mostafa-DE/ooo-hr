@@ -41,7 +41,7 @@ export function HomePage() {
           Team visibility for approved leave requests.
         </p>
       </div>
-      {user ? (
+      {user && !showAdminWidget ? (
         <div className="rounded-xl border bg-card p-6 text-card-foreground">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold">Balance overview ({currentYear})</h2>

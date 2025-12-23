@@ -18,6 +18,10 @@ export async function setJoinDate(
     throw new Error('Join date must be a valid date.')
   }
 
+  if (input.joinDate > new Date()) {
+    throw new Error('Join date cannot be in the future.')
+  }
+
   if (input.currentJoinDate) {
     throw new Error('Join date is already set and cannot be changed.')
   }

@@ -62,8 +62,23 @@ describe('formatDurationWithDays', () => {
     expect(formatDurationWithDays(960)).toBe('2d')
   })
 
-  it('formats days plus remainder', () => {
+  it('formats half-day as 0.5d', () => {
+    expect(formatDurationWithDays(240)).toBe('0.5d')
+  })
+
+  it('formats days plus half-day', () => {
+    expect(formatDurationWithDays(720)).toBe('1.5d')
+    expect(formatDurationWithDays(1200)).toBe('2.5d')
+  })
+
+  it('formats days plus remainder (not half)', () => {
     expect(formatDurationWithDays(600)).toBe('1d 2h')
+    expect(formatDurationWithDays(510)).toBe('1d 30m')
+  })
+
+  it('formats less than half-day as hours', () => {
+    expect(formatDurationWithDays(120)).toBe('2h')
+    expect(formatDurationWithDays(30)).toBe('30m')
   })
 })
 
