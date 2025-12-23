@@ -10,6 +10,7 @@ import { MyRequestsPage } from '@/pages/MyRequestsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { RequestLeavePage } from '@/pages/RequestLeavePage'
 import { AdminPage } from '@/pages/admin/AdminPage'
+import { AdminUserDetailsPage } from '@/pages/admin/AdminUserDetailsPage'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/my-balances" element={<BalanceAdjustmentsPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/user/:userId" element={<AdminUserDetailsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Route>

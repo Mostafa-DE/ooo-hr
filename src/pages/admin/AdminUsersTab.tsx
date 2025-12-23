@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,7 @@ function UserRow({
   onOpenBalances,
   onOpenAdjustments,
 }: UserRowProps) {
+  const navigate = useNavigate();
   const [isWhitelisted, setIsWhitelisted] = useState(user.isWhitelisted);
   const [role, setRole] = useState<UserRole>(user.role);
   const [teamId, setTeamId] = useState<string | null>(user.teamId);
@@ -222,7 +224,10 @@ function UserRow({
   };
 
   return (
-    <tr className="border-b last:border-b-0">
+    <tr
+      className="border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors"
+      onClick={() => navigate(`/admin/user/${user.uid}`)}
+    >
       <td className="px-3 py-3">
         <div className="flex flex-col">
           <span className="font-medium">{user.displayName}</span>
@@ -237,7 +242,7 @@ function UserRow({
           {user.isWhitelisted ? "Whitelisted" : "Blocked"}
         </Badge>
       </td>
-      <td className="px-3 py-3">
+      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
         <select
           className="h-9 rounded-md border bg-background px-2 text-sm"
           value={role}
@@ -250,7 +255,7 @@ function UserRow({
           ))}
         </select>
       </td>
-      <td className="px-3 py-3 text-sm">
+      <td className="px-3 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
         <select
           className="h-9 rounded-md border bg-background px-2 text-sm disabled:opacity-50"
           value={teamId ?? ""}
@@ -271,7 +276,7 @@ function UserRow({
           Current: {teamLabel}
         </div>
       </td>
-      <td className="px-3 py-3">
+      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-col gap-2">
           <label className="flex items-center gap-2 text-sm">
             <input
