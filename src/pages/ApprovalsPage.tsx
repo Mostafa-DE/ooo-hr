@@ -51,7 +51,7 @@ function canApprove(
   isAdmin: boolean
 ) {
   if (isAdmin) {
-    return request.status === "SUBMITTED" || request.status === "TL_APPROVED";
+    return false;
   }
 
   if (teamLeadUid === actorUid && request.status === "SUBMITTED") {

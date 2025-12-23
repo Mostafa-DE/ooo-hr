@@ -33,7 +33,9 @@ export function AppShell() {
       <header className="border-b">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-            <div className="shrink-0 text-lg font-semibold tracking-tight">OOO</div>
+            <Link to="/" className="shrink-0">
+              <img src="/ooo.png" alt="OOO" className="h-10 w-10" />
+            </Link>
             <nav className="-mx-2 flex items-center gap-1 overflow-x-auto px-2 sm:mx-0 sm:flex-wrap sm:px-0">
               {navigationItems
                 .filter((item) => (item.to === '/admin' ? isAdmin : true))
