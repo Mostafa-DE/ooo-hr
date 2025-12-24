@@ -13,7 +13,6 @@ import { useAllRequests } from "@/hooks/useAllRequests";
 import { useUsersList } from "@/hooks/useUsersList";
 import { useTeamsList } from "@/hooks/useTeamsList";
 import { useToast } from "@/hooks/useToast";
-import { useLeaveBalanceAdjustments } from "@/hooks/useLeaveBalanceAdjustments";
 import { useLeaveBalances } from "@/hooks/useLeaveBalances";
 import { calculateAccrualReference } from "@/lib/accrual";
 import {
@@ -196,7 +195,6 @@ function UsageSummaryPanel({ userId, summaryByUser }: UsageSummaryPanelProps) {
 
 function AccrualPanel({ request, userProfile }: AccrualPanelProps) {
   const { balances } = useLeaveBalances(request.employeeUid);
-  const { adjustments } = useLeaveBalanceAdjustments(request.employeeUid);
   const [showFormula, setShowFormula] = useState(false);
   const requestYear = getRequestYear(request);
 
@@ -221,15 +219,6 @@ function AccrualPanel({ request, userProfile }: AccrualPanelProps) {
     (balance) =>
       balance.leaveTypeId === "annual" && balance.year === requestYear
   );
-
-  const adminAdjustmentMinutes = adjustments
-    .filter(
-      (adjustment) =>
-        adjustment.leaveTypeId === "annual" &&
-        adjustment.year === requestYear &&
-        adjustment.source === "admin"
-    )
-    .reduce((total, adjustment) => total + adjustment.deltaMinutes, 0);
 
   if (!annualBalance) {
     return (
@@ -277,9 +266,6 @@ function AccrualPanel({ request, userProfile }: AccrualPanelProps) {
         <div>Used paid annual (policy - balance): {formatSignedMinutes(usedPaidMinutes)}</div>
         <div>
           Remaining (current balance): {formatSignedMinutes(remainingMinutes)}
-        </div>
-        <div>
-          Admin adjustments (year): {formatSignedMinutes(adminAdjustmentMinutes)}
         </div>
         <div>
           Monthly rate (policy):{" "}
