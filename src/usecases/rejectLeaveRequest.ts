@@ -1,9 +1,15 @@
 import type { LeaveRequestRepository } from '@/lib/leaveRequestRepository'
+import type { UserRepository } from '@/lib/userRepository'
+import type { TeamRepository } from '@/lib/teamRepository'
 import type { LeaveRequest } from '@/types/leave'
 import type { Team } from '@/types/team'
+import { emailService } from '@/lib/emailService'
+import { fetchEmployeeRecipient, formatRequestDates } from '@/lib/emailHelpers'
 
 type RejectLeaveRequestContext = {
   leaveRequestRepository: LeaveRequestRepository
+  userRepository: UserRepository
+  teamRepository: TeamRepository
 }
 
 type RejectLeaveRequestInput = {
@@ -32,6 +38,17 @@ export async function rejectLeaveRequest(
       actorUid,
       reason,
     })
+
+    // Send rejection notification
+    if (emailService.isEnabled()) {
+      sendRejectionNotification({
+        request,
+        actorUid,
+        reason,
+        context,
+        approverRole: 'Team Lead',
+      }).catch((error) => console.error('[rejectLeaveRequest] Email failed:', error))
+    }
     return
   }
 
@@ -46,9 +63,62 @@ export async function rejectLeaveRequest(
         actorUid,
         reason,
       })
+
+      // Send rejection notification
+      if (emailService.isEnabled()) {
+        sendRejectionNotification({
+          request,
+          actorUid,
+          reason,
+          context,
+          approverRole: 'Manager',
+        }).catch((error) => console.error('[rejectLeaveRequest] Email failed:', error))
+      }
       return
     }
   }
 
   throw new Error('You are not allowed to reject this request.')
+}
+
+async function sendRejectionNotification(params: {
+  request: LeaveRequest
+  actorUid: string
+  reason: string | null
+  context: RejectLeaveRequestContext
+  approverRole: 'Team Lead' | 'Manager'
+}) {
+  try {
+    const employee = await fetchEmployeeRecipient(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.request.employeeUid,
+    )
+
+    const approver = await fetchEmployeeRecipient(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.actorUid,
+    )
+
+    if (!employee || !approver) {
+      return
+    }
+
+    const dates = formatRequestDates(params.request)
+
+    await emailService.sendNotification({
+      type: 'REQUEST_REJECTED',
+      requestId: params.request.id,
+      employeeEmail: employee.email,
+      employeeName: employee.name,
+      leaveType: params.request.type,
+      ...dates,
+      note: params.request.note,
+      approverName: approver.name,
+      approverRole: params.approverRole,
+      rejectionReason: params.reason,
+      recipients: [employee],
+    })
+  } catch (error) {
+    console.error('[rejectLeaveRequest] Rejection notification error:', error)
+  }
 }

@@ -40,7 +40,7 @@ const statusLabels: Record<string, string> = {
 
 export function MyRequestsPage() {
   const { user } = useAuth()
-  const { leaveRequestRepository } = useRepositories()
+  const { leaveRequestRepository, userRepository, teamRepository } = useRepositories()
   const toast = useToast()
   const { profile } = useUserProfile()
   const { requests, loading, error } = useLeaveRequests(user?.uid ?? null)
@@ -103,14 +103,14 @@ export function MyRequestsPage() {
   }, [users])
 
   const handleCancel = async (request: LeaveRequest) => {
-    if (!user || !leaveRequestRepository) {
+    if (!user || !leaveRequestRepository || !userRepository || !teamRepository) {
       return
     }
 
     setCancelling(true)
     try {
       await cancelLeaveRequest(
-        { leaveRequestRepository },
+        { leaveRequestRepository, userRepository, teamRepository },
         {
           request,
           actorUid: user.uid,

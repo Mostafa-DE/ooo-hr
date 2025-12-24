@@ -21,7 +21,7 @@ export function RequestLeavePage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { team } = useTeam(profile?.teamId ?? null)
-  const { leaveRequestRepository, leaveBalanceRepository } = useRepositories()
+  const { leaveRequestRepository, leaveBalanceRepository, userRepository, teamRepository } = useRepositories()
   const toast = useToast()
   const { balances } = useLeaveBalances(user?.uid ?? null)
 
@@ -126,6 +126,8 @@ export function RequestLeavePage() {
       !profile.teamId ||
       !leaveRequestRepository ||
       !leaveBalanceRepository ||
+      !userRepository ||
+      !teamRepository ||
       !team
     ) {
       return
@@ -145,7 +147,7 @@ export function RequestLeavePage() {
 
     try {
       await createLeaveRequest(
-        { leaveRequestRepository, leaveBalanceRepository },
+        { leaveRequestRepository, leaveBalanceRepository, userRepository, teamRepository },
         {
           employeeUid: user.uid,
           teamId: profile.teamId,

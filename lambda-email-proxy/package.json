@@ -1,0 +1,19 @@
+{
+  "name": "ooo-email-proxy-lambda",
+  "version": "1.0.0",
+  "description": "AWS Lambda proxy for Resend email service",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --format=cjs",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "resend": "^6.6.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.9.3"
+  }
+}

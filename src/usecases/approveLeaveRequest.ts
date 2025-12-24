@@ -1,10 +1,16 @@
 import type { LeaveRequestRepository } from '@/lib/leaveRequestRepository'
+import type { UserRepository } from '@/lib/userRepository'
+import type { TeamRepository } from '@/lib/teamRepository'
 import type { Team } from '@/types/team'
 import type { LeaveRequest } from '@/types/leave'
 import type { UserRole } from '@/types/user'
+import { emailService } from '@/lib/emailService'
+import { fetchEmployeeRecipient, fetchApproverRecipients, formatRequestDates } from '@/lib/emailHelpers'
 
 type ApproveLeaveRequestContext = {
   leaveRequestRepository: LeaveRequestRepository
+  userRepository: UserRepository
+  teamRepository: TeamRepository
 }
 
 type ApproveLeaveRequestInput = {
@@ -70,12 +76,31 @@ export async function approveLeaveRequest(
         year: requestYear,
         durationMinutes,
       })
+
+      // Send final approval notification to employee
+      if (emailService.isEnabled()) {
+        sendFinalApprovalNotification({
+          request,
+          actorUid,
+          context,
+          approverRole: 'Team Lead',
+        }).catch((error) => console.error('[approveLeaveRequest] Email failed:', error))
+      }
     } else {
       await context.leaveRequestRepository.approveAsTeamLead({
         requestId: request.id,
         actorUid,
         autoApprove: false,
       })
+
+      // Send notification to manager
+      if (emailService.isEnabled()) {
+        sendTLApprovedWithManagerNotification({
+          request,
+          actorUid,
+          context,
+        }).catch((error) => console.error('[approveLeaveRequest] Email failed:', error))
+      }
     }
     return
   }
@@ -90,6 +115,16 @@ export async function approveLeaveRequest(
         year: requestYear,
         durationMinutes,
       })
+
+      // Send final approval notification to employee
+      if (emailService.isEnabled()) {
+        sendFinalApprovalNotification({
+          request,
+          actorUid,
+          context,
+          approverRole: 'Manager',
+        }).catch((error) => console.error('[approveLeaveRequest] Email failed:', error))
+      }
       return
     }
 
@@ -102,9 +137,107 @@ export async function approveLeaveRequest(
         year: requestYear,
         durationMinutes,
       })
+
+      // Send final approval notification to employee
+      if (emailService.isEnabled()) {
+        sendFinalApprovalNotification({
+          request,
+          actorUid,
+          context,
+          approverRole: 'Manager',
+        }).catch((error) => console.error('[approveLeaveRequest] Email failed:', error))
+      }
       return
     }
   }
 
   throw new Error('You are not allowed to approve this request.')
+}
+
+async function sendFinalApprovalNotification(params: {
+  request: LeaveRequest
+  actorUid: string
+  context: ApproveLeaveRequestContext
+  approverRole: 'Team Lead' | 'Manager'
+}) {
+  try {
+    const employee = await fetchEmployeeRecipient(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.request.employeeUid,
+    )
+
+    const approver = await fetchEmployeeRecipient(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.actorUid,
+    )
+
+    if (!employee || !approver) {
+      return
+    }
+
+    const dates = formatRequestDates(params.request)
+
+    const notificationType = params.approverRole === 'Manager'
+      ? 'MANAGER_APPROVED_FINAL'
+      : 'TL_APPROVED_FINAL'
+
+    await emailService.sendNotification({
+      type: notificationType,
+      requestId: params.request.id,
+      employeeEmail: employee.email,
+      employeeName: employee.name,
+      leaveType: params.request.type,
+      ...dates,
+      note: params.request.note,
+      approverName: approver.name,
+      approverRole: params.approverRole,
+      recipients: [employee],
+    })
+  } catch (error) {
+    console.error('[approveLeaveRequest] Final approval notification error:', error)
+  }
+}
+
+async function sendTLApprovedWithManagerNotification(params: {
+  request: LeaveRequest
+  actorUid: string
+  context: ApproveLeaveRequestContext
+}) {
+  try {
+    const { manager } = await fetchApproverRecipients(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.request.teamId,
+    )
+
+    const employee = await fetchEmployeeRecipient(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.request.employeeUid,
+    )
+
+    const teamLead = await fetchEmployeeRecipient(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.actorUid,
+    )
+
+    if (!manager || !employee) {
+      return
+    }
+
+    const dates = formatRequestDates(params.request)
+
+    await emailService.sendNotification({
+      type: 'TL_APPROVED_WITH_MANAGER',
+      requestId: params.request.id,
+      employeeEmail: employee.email,
+      employeeName: employee.name,
+      leaveType: params.request.type,
+      ...dates,
+      note: params.request.note,
+      approverName: teamLead?.name,
+      teamLeadApprovalDate: new Date().toLocaleDateString(),
+      recipients: [manager],
+    })
+  } catch (error) {
+    console.error('[approveLeaveRequest] TL approved notification error:', error)
+  }
 }

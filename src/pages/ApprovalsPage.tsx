@@ -321,7 +321,7 @@ export function ApprovalsPage() {
   const { requests, loading, error } = isAdmin ? allRequests : teamRequests;
   const { users } = useUsersList();
   const { teams } = useTeamsList();
-  const { leaveRequestRepository } = useRepositories();
+  const { leaveRequestRepository, userRepository, teamRepository } = useRepositories();
   const toast = useToast();
   const [reasonByRequest, setReasonByRequest] = useState<
     Record<string, string>
@@ -419,7 +419,7 @@ export function ApprovalsPage() {
   }, [historyRequests, historyFilterUser]);
 
   const handleApprove = async (request: LeaveRequest) => {
-    if (!user || !leaveRequestRepository) {
+    if (!user || !leaveRequestRepository || !userRepository || !teamRepository) {
       return;
     }
 
@@ -427,7 +427,7 @@ export function ApprovalsPage() {
 
     try {
       await approveLeaveRequest(
-        { leaveRequestRepository },
+        { leaveRequestRepository, userRepository, teamRepository },
         {
           request,
           team: isAdmin ? null : team,
@@ -446,7 +446,7 @@ export function ApprovalsPage() {
   };
 
   const handleReject = async (request: LeaveRequest) => {
-    if (!user || !team || !leaveRequestRepository) {
+    if (!user || !team || !leaveRequestRepository || !userRepository || !teamRepository) {
       return;
     }
 
@@ -456,7 +456,7 @@ export function ApprovalsPage() {
 
     try {
       await rejectLeaveRequest(
-        { leaveRequestRepository },
+        { leaveRequestRepository, userRepository, teamRepository },
         { request, team, actorUid: user.uid, reason }
       );
       toast.push({ title: "Request rejected", description: "Status updated." });
@@ -471,7 +471,7 @@ export function ApprovalsPage() {
   };
 
   const handleCancel = async (request: LeaveRequest) => {
-    if (!user || !leaveRequestRepository) {
+    if (!user || !leaveRequestRepository || !userRepository || !teamRepository) {
       return;
     }
 
@@ -483,7 +483,7 @@ export function ApprovalsPage() {
 
     try {
       await cancelLeaveRequest(
-        { leaveRequestRepository },
+        { leaveRequestRepository, userRepository, teamRepository },
         {
           request,
           actorUid: user.uid,

@@ -1,11 +1,18 @@
 import type { LeaveRequestRepository } from '@/lib/leaveRequestRepository'
 import type { LeaveBalanceRepository } from '@/lib/leaveBalanceRepository'
-import { computeWorkingMinutes, hasOverlap, isWorkingDay } from '@/lib/leave'
+import type { UserRepository } from '@/lib/userRepository'
+import type { TeamRepository } from '@/lib/teamRepository'
+import { computeWorkingMinutes, hasOverlap, isWorkingDay, formatDateTime, formatDurationWithDays } from '@/lib/leave'
 import type { LeaveType } from '@/types/leave'
+import { emailService } from '@/lib/emailService'
+import { fetchApproverRecipients, fetchEmployeeRecipient } from '@/lib/emailHelpers'
+import type { EmailRecipient } from '@/types/email'
 
 type CreateLeaveRequestContext = {
   leaveRequestRepository: LeaveRequestRepository
   leaveBalanceRepository: LeaveBalanceRepository
+  userRepository: UserRepository
+  teamRepository: TeamRepository
 }
 
 type CreateLeaveRequestInput = {
@@ -74,6 +81,18 @@ export async function createLeaveRequest(
     note: input.note,
   })
 
+  // Send email notification (don't await - fire and forget)
+  if (emailService.isEnabled()) {
+    sendRequestCreatedNotification({
+      requestId,
+      request: input,
+      requestedMinutes,
+      context,
+    }).catch((error) => {
+      console.error('[createLeaveRequest] Failed to send email:', error)
+    })
+  }
+
   if (input.teamLeadUid === input.employeeUid && !input.managerUid) {
     await context.leaveRequestRepository.approveAsTeamLeadWithBalance({
       requestId,
@@ -85,4 +104,54 @@ export async function createLeaveRequest(
   }
 
   return { requestedMinutes }
+}
+
+async function sendRequestCreatedNotification(params: {
+  requestId: string
+  request: CreateLeaveRequestInput
+  requestedMinutes: number
+  context: CreateLeaveRequestContext
+}) {
+  try {
+    const { teamLead, manager } = await fetchApproverRecipients(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.request.teamId,
+    )
+
+    const employee = await fetchEmployeeRecipient(
+      { userRepository: params.context.userRepository, teamRepository: params.context.teamRepository },
+      params.request.employeeUid,
+    )
+
+    if (!employee) {
+      console.warn('[createLeaveRequest] Cannot send notification: employee email not found')
+      return
+    }
+
+    const recipients = [teamLead, manager].filter((r): r is EmailRecipient => r !== null)
+
+    if (recipients.length === 0) {
+      console.warn('[createLeaveRequest] No approvers to notify')
+      return
+    }
+
+    console.log('====================================');
+    console.log("sending email to", recipients);
+    console.log('====================================');
+
+    await emailService.sendNotification({
+      type: 'REQUEST_CREATED',
+      requestId: params.requestId,
+      employeeEmail: employee.email,
+      employeeName: employee.name,
+      leaveType: params.request.type,
+      startDate: formatDateTime(params.request.startAt),
+      endDate: formatDateTime(params.request.endAt),
+      duration: formatDurationWithDays(params.requestedMinutes),
+      note: params.request.note,
+      recipients,
+    })
+  } catch (error) {
+    console.error('[createLeaveRequest] Notification error:', error)
+  }
 }
