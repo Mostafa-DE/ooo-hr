@@ -13,6 +13,7 @@ type UserProfile = {
   joinDate?: Timestamp
   createdAt?: Timestamp
   lastLoginAt?: Timestamp
+  annualEntitlementDays?: number
 }
 
 const userRoles = ['admin', 'employee', 'team_lead', 'manager'] as const

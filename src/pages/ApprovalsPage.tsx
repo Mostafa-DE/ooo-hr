@@ -101,6 +101,7 @@ function canReject(
 type AccrualPanelProps = {
   request: LeaveRequest;
   userProfile?: UserProfile;
+  usedAnnualMinutes: number;
 };
 
 type UsageTotals = {
@@ -110,10 +111,7 @@ type UsageTotals = {
 
 type UsageSummary = Record<LeaveType, UsageTotals>;
 
-const POLICY_ANNUAL_ENTITLEMENT_DAYS = 15;
 const DAILY_MINUTES = 480;
-const POLICY_ANNUAL_ENTITLEMENT_MINUTES =
-  POLICY_ANNUAL_ENTITLEMENT_DAYS * DAILY_MINUTES;
 const LEAVE_TYPES: LeaveType[] = ["annual", "sick", "unpaid", "other"];
 
 function formatSignedMinutes(value: number) {
@@ -193,7 +191,7 @@ function UsageSummaryPanel({ userId, summaryByUser }: UsageSummaryPanelProps) {
   );
 }
 
-function AccrualPanel({ request, userProfile }: AccrualPanelProps) {
+function AccrualPanel({ request, userProfile, usedAnnualMinutes }: AccrualPanelProps) {
   const { balances } = useLeaveBalances(request.employeeUid);
   const [showFormula, setShowFormula] = useState(false);
   const requestYear = getRequestYear(request);
@@ -209,6 +207,16 @@ function AccrualPanel({ request, userProfile }: AccrualPanelProps) {
       </div>
     );
   }
+
+  if (!userProfile.annualEntitlementDays) {
+    return (
+      <div className="mt-3 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
+        Annual entitlement is not set. Accrual reference is unavailable.
+      </div>
+    );
+  }
+
+  const userEntitlementMinutes = userProfile.annualEntitlementDays * DAILY_MINUTES;
 
   const joinDateValue = userProfile.joinDate.toDate();
   const joinYear = joinDateValue.getFullYear();
@@ -231,14 +239,16 @@ function AccrualPanel({ request, userProfile }: AccrualPanelProps) {
 
   const currentMonth = new Date().getMonth() + 1;
   const accrual = calculateAccrualReference({
-    annualEntitlementMinutes: POLICY_ANNUAL_ENTITLEMENT_MINUTES,
+    annualEntitlementMinutes: userEntitlementMinutes,
     joinMonth,
     currentMonth,
   });
   const remainingMinutes = annualBalance.balanceMinutes;
-  const usedPaidMinutes =
-    POLICY_ANNUAL_ENTITLEMENT_MINUTES - remainingMinutes;
-  const advanceMinutes = usedPaidMinutes - accrual.entitlementMinutes;
+  // Carryover = current balance - entitlement + already used this year
+  const carryoverMinutes = Math.max(0, remainingMinutes - userEntitlementMinutes + usedAnnualMinutes);
+  const availableWithoutAdvance = accrual.entitlementMinutes + carryoverMinutes;
+  const usageIncludingRequest = usedAnnualMinutes + request.requestedMinutes;
+  const advanceMinutes = usageIncludingRequest - availableWithoutAdvance;
 
   return (
     <div className="mt-3 rounded-lg border bg-muted/10 p-3 text-xs text-muted-foreground">
@@ -255,22 +265,22 @@ function AccrualPanel({ request, userProfile }: AccrualPanelProps) {
       </div>
       <div className="mt-2 grid gap-1 sm:grid-cols-2">
         <div>
-          Annual entitlement (policy):{" "}
-          {formatDurationWithDays(POLICY_ANNUAL_ENTITLEMENT_MINUTES)}
+          Annual entitlement:{" "}
+          {formatDurationWithDays(userEntitlementMinutes)}
         </div>
         {isJoinYear ? (
           <div>
             Join date: {joinDateValue.toLocaleDateString()}
           </div>
         ) : null}
-        <div>Used paid annual (policy - balance): {formatSignedMinutes(usedPaidMinutes)}</div>
+        <div>Used paid annual: {formatSignedMinutes(usedAnnualMinutes)}</div>
         <div>
           Remaining (current balance): {formatSignedMinutes(remainingMinutes)}
         </div>
         <div>
-          Monthly rate (policy):{" "}
+          Monthly rate:{" "}
           {formatDurationWithDays(
-            Math.round(POLICY_ANNUAL_ENTITLEMENT_MINUTES / 12)
+            Math.round(userEntitlementMinutes / 12)
           )}
         </div>
         <div>
@@ -280,7 +290,7 @@ function AccrualPanel({ request, userProfile }: AccrualPanelProps) {
       </div>
       {showFormula ? (
         <div className="mt-2 text-xs text-muted-foreground">
-          Formula: (policy entitlement ÷ 12) × months since join (
+          Formula: (entitlement ÷ 12) × months since join (
           {accrual.monthsSinceJoin}) · {requestYear}
         </div>
       ) : null}
@@ -576,6 +586,7 @@ export function ApprovalsPage() {
                     <AccrualPanel
                       request={request}
                       userProfile={userProfilesById.get(request.employeeUid)}
+                      usedAnnualMinutes={usageSummaryByUser.get(request.employeeUid)?.annual?.minutes ?? 0}
                     />
                     <UsageSummaryPanel
                       userId={request.employeeUid}

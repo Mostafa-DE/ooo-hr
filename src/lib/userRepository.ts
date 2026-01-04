@@ -31,6 +31,7 @@ type UserRepository = {
   upsertUserOnLogin: (input: CreateUserInput) => Promise<void>
   updateUserAdmin: (input: UpdateUserAdminInput) => Promise<void>
   updateUserJoinDate: (input: { uid: string; joinDate: Date }) => Promise<void>
+  updateUserEntitlement: (input: { uid: string; annualEntitlementDays: number }) => Promise<void>
   fetchUsersByIds: (uids: string[]) => Promise<UserProfile[]>
   subscribeUsers: (
     onData: (users: UserProfile[]) => void,
@@ -74,6 +75,10 @@ function buildUserProfile(
     joinDate: readTimestamp(record?.joinDate),
     createdAt: readTimestamp(record?.createdAt),
     lastLoginAt: readTimestamp(record?.lastLoginAt),
+    annualEntitlementDays:
+      typeof record?.annualEntitlementDays === 'number'
+        ? record.annualEntitlementDays
+        : undefined,
   }
 }
 
@@ -126,6 +131,13 @@ export function createUserRepository(db: Firestore): UserRepository {
 
       await updateDoc(ref, {
         joinDate: Timestamp.fromDate(input.joinDate),
+      })
+    },
+    updateUserEntitlement: async (input) => {
+      const ref = doc(db, 'users', input.uid)
+
+      await updateDoc(ref, {
+        annualEntitlementDays: input.annualEntitlementDays,
       })
     },
     fetchUsersByIds: async (uids) => {

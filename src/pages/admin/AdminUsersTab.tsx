@@ -35,14 +35,6 @@ import { setJoinDate } from "@/usecases/setJoinDate";
 const roleOptions: UserRole[] = ["employee", "team_lead", "manager", "admin"];
 const leaveTypeOptions: LeaveType[] = ["annual", "sick", "unpaid", "other"];
 
-function formatTimestamp(value?: { toDate: () => Date }) {
-  if (!value) {
-    return "—";
-  }
-
-  return value.toDate().toLocaleString();
-}
-
 function formatDateInput(value?: Date) {
   if (!value) {
     return "";
@@ -79,6 +71,8 @@ type UserRowProps = {
     role: UserRole;
     teamId: string | null;
   }) => Promise<void>;
+  onSaveJoinDate: (input: { uid: string; joinDate: Date }) => Promise<void>;
+  onSaveEntitlement: (input: { uid: string; annualEntitlementDays: number }) => Promise<void>;
   actorUid: string;
   fetchPendingRequests: (uid: string) => Promise<LeaveRequest[]>;
   fetchTeamPendingRequests: (teamId: string) => Promise<LeaveRequest[]>;
@@ -95,6 +89,7 @@ type UserRowProps = {
   }) => Promise<void>;
   onOpenBalances: (user: UserProfile) => void;
   onOpenAdjustments: (user: UserProfile) => void;
+  onSaveComplete: () => void;
 };
 
 function UserRow({
@@ -103,6 +98,8 @@ function UserRow({
   teamOptions,
   users,
   onSave,
+  onSaveJoinDate,
+  onSaveEntitlement,
   actorUid,
   fetchPendingRequests,
   fetchTeamPendingRequests,
@@ -110,20 +107,32 @@ function UserRow({
   onUpdateTeamAssignments,
   onOpenBalances,
   onOpenAdjustments,
+  onSaveComplete,
 }: UserRowProps) {
   const navigate = useNavigate();
   const [isWhitelisted, setIsWhitelisted] = useState(user.isWhitelisted);
   const [role, setRole] = useState<UserRole>(user.role);
   const [teamId, setTeamId] = useState<string | null>(user.teamId);
+  const [joinDateDraft, setJoinDateDraft] = useState(
+    user.joinDate ? formatDateInput(user.joinDate.toDate()) : ""
+  );
+  const [entitlementDraft, setEntitlementDraft] = useState(
+    user.annualEntitlementDays !== undefined ? String(user.annualEntitlementDays) : ""
+  );
   const [saving, setSaving] = useState(false);
   const isAdmin = user.role === "admin";
 
   const teamLabel = user.teamId ? teamNameById.get(user.teamId) ?? "—" : "—";
+  const hasJoinDate = Boolean(user.joinDate);
+  const currentJoinDateStr = user.joinDate ? formatDateInput(user.joinDate.toDate()) : "";
+  const currentEntitlementStr = user.annualEntitlementDays !== undefined ? String(user.annualEntitlementDays) : "";
 
   const hasChanges =
     isWhitelisted !== user.isWhitelisted ||
     role !== user.role ||
-    (!isAdmin && teamId !== user.teamId);
+    (!isAdmin && teamId !== user.teamId) ||
+    (!hasJoinDate && joinDateDraft !== currentJoinDateStr) ||
+    entitlementDraft !== currentEntitlementStr;
 
   const handleSave = async () => {
     const isTeamChange = !isAdmin && teamId !== user.teamId;
@@ -186,6 +195,24 @@ function UserRow({
       }
     }
 
+    // Validate join date if being set
+    if (!hasJoinDate && joinDateDraft.trim()) {
+      const parsedDate = new Date(`${joinDateDraft}T00:00:00`);
+      if (Number.isNaN(parsedDate.getTime())) {
+        window.alert("Invalid join date.");
+        return;
+      }
+    }
+
+    // Validate entitlement if being set
+    if (entitlementDraft.trim()) {
+      const parsed = Number.parseInt(entitlementDraft.trim(), 10);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        window.alert("Invalid entitlement. Enter a positive number.");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       await onSave({
@@ -194,6 +221,18 @@ function UserRow({
         role,
         teamId: nextTeamId,
       });
+
+      // Save join date if changed and not already set
+      if (!hasJoinDate && joinDateDraft.trim() && joinDateDraft !== currentJoinDateStr) {
+        const parsedDate = new Date(`${joinDateDraft}T00:00:00`);
+        await onSaveJoinDate({ uid: user.uid, joinDate: parsedDate });
+      }
+
+      // Save entitlement if changed
+      if (entitlementDraft !== currentEntitlementStr && entitlementDraft.trim()) {
+        const parsed = Number.parseInt(entitlementDraft.trim(), 10);
+        await onSaveEntitlement({ uid: user.uid, annualEntitlementDays: parsed });
+      }
 
       if (needsCancel) {
         const pendingRequests = await fetchPendingRequests(user.uid);
@@ -218,6 +257,8 @@ function UserRow({
         uid: user.uid,
         role,
       });
+
+      onSaveComplete();
     } finally {
       setSaving(false);
     }
@@ -229,18 +270,13 @@ function UserRow({
       onClick={() => navigate(`/admin/user/${user.uid}`)}
     >
       <td className="px-3 py-3">
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-1">
           <span className="font-medium">{user.displayName}</span>
-          <span className="text-xs text-muted-foreground">
-            Last login: {formatTimestamp(user.lastLoginAt)}
-          </span>
+          <span className="text-xs text-muted-foreground">{user.email}</span>
+          <Badge variant={user.isWhitelisted ? "default" : "outline"} className="w-fit">
+            {user.isWhitelisted ? "Whitelisted" : "Blocked"}
+          </Badge>
         </div>
-      </td>
-      <td className="px-3 py-3 text-sm text-muted-foreground">{user.email}</td>
-      <td className="px-3 py-3">
-        <Badge variant={user.isWhitelisted ? "default" : "outline"}>
-          {user.isWhitelisted ? "Whitelisted" : "Blocked"}
-        </Badge>
       </td>
       <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
         <select
@@ -275,6 +311,30 @@ function UserRow({
         <div className="text-xs text-muted-foreground">
           Current: {teamLabel}
         </div>
+      </td>
+      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+        {hasJoinDate ? (
+          <span className="text-sm">
+            {user.joinDate?.toDate().toLocaleDateString()}
+          </span>
+        ) : (
+          <Input
+            type="date"
+            className="h-8 w-32 text-xs"
+            value={joinDateDraft}
+            onChange={(e) => setJoinDateDraft(e.target.value)}
+          />
+        )}
+      </td>
+      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+        <Input
+          type="number"
+          min="0"
+          className="h-8 w-16 text-xs"
+          value={entitlementDraft}
+          onChange={(e) => setEntitlementDraft(e.target.value)}
+          placeholder="days"
+        />
       </td>
       <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-col gap-2">
@@ -336,8 +396,6 @@ export function AdminUsersTab() {
   const [reference, setReference] = useState("");
   const [adjusting, setAdjusting] = useState(false);
   const [carrying, setCarrying] = useState(false);
-  const [joinDateDraft, setJoinDateDraft] = useState("");
-  const [settingJoinDate, setSettingJoinDate] = useState(false);
 
   const { balances } = useLeaveBalances(balanceUser?.uid ?? null);
   const { adjustments } = useLeaveBalanceAdjustments(
@@ -388,16 +446,6 @@ export function AdminUsersTab() {
       setBalanceUser(latest);
     }
   }, [balanceUser, users]);
-
-  useEffect(() => {
-    if (!balanceUser) {
-      return;
-    }
-
-    setJoinDateDraft(
-      balanceUser.joinDate ? formatDateInput(balanceUser.joinDate.toDate()) : ""
-    );
-  }, [balanceUser]);
 
   const updateTeamAssignments = async ({
     previousTeamId,
@@ -467,29 +515,29 @@ export function AdminUsersTab() {
   };
 
   const currentYear = new Date().getFullYear();
-  const hasStaleBalance = balances.some((balance) =>
-    isStaleBalanceYear(balance.year, currentYear)
-  );
+  const hasStaleBalance = balances.some((balance) => {
+    if (balance.leaveTypeId !== "annual") {
+      return false;
+    }
+    if (!isStaleBalanceYear(balance.year, currentYear)) {
+      return false;
+    }
+    const wasCarriedOver = balances.some(
+      (b) =>
+        b.leaveTypeId === balance.leaveTypeId &&
+        b.lastCarryoverFromYear === balance.year
+    );
+    if (wasCarriedOver) {
+      return false;
+    }
+    return true;
+  });
 
   const selectedBalance = balances.find(
     (balance) =>
       balance.leaveTypeId === balanceType && balance.year === balanceYear
   );
 
-  useEffect(() => {
-    if (!balanceUser) {
-      return;
-    }
-
-    const yearsForType = balances
-      .filter((balance) => balance.leaveTypeId === balanceType)
-      .map((balance) => balance.year)
-      .sort((a, b) => b - a);
-
-    if (yearsForType.length > 0 && !yearsForType.includes(balanceYear)) {
-      setBalanceYear(yearsForType[0]);
-    }
-  }, [balanceType, balanceUser, balanceYear, balances]);
 
   if (loading) {
     return <LoadingState variant="inline" title="Loading users..." />;
@@ -553,15 +601,13 @@ export function AdminUsersTab() {
   };
 
   const handleOpenBalances = (user: UserProfile) => {
+    const nowYear = new Date().getFullYear();
     setBalanceUser(user);
     setBalanceType("annual");
-    setBalanceYear(currentYear);
+    setBalanceYear(nowYear);
     setDeltaMinutes("");
     setReason("");
     setReference("");
-    setJoinDateDraft(
-      user.joinDate ? formatDateInput(user.joinDate.toDate()) : ""
-    );
   };
 
   const handleOpenAdjustments = (user: UserProfile) => {
@@ -582,9 +628,6 @@ export function AdminUsersTab() {
     });
   };
 
-  const joinDateLabel = balanceUser?.joinDate
-    ? balanceUser.joinDate.toDate().toLocaleDateString()
-    : "—";
   const joinDateMissing = balanceUser ? !balanceUser.joinDate : false;
 
   const handleAdjustBalance = async () => {
@@ -686,58 +729,6 @@ export function AdminUsersTab() {
     }
   };
 
-  const handleSetJoinDate = async () => {
-    if (!balanceUser || !userRepository) {
-      return;
-    }
-
-    if (!joinDateDraft.trim()) {
-      toast.push({
-        title: "Join date required",
-        description: "Select a join date before saving.",
-      });
-      return;
-    }
-
-    const parsedJoinDate = new Date(`${joinDateDraft}T00:00:00`);
-    if (Number.isNaN(parsedJoinDate.getTime())) {
-      toast.push({
-        title: "Join date required",
-        description: "Select a valid join date before saving.",
-      });
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Join date can only be set once. It cannot be changed later. Continue?"
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setSettingJoinDate(true);
-    try {
-      await setJoinDate(
-        { userRepository },
-        {
-          uid: balanceUser.uid,
-          joinDate: parsedJoinDate,
-          currentJoinDate: balanceUser.joinDate?.toDate() ?? null,
-        }
-      );
-      toast.push({
-        title: "Join date saved",
-        description: "Join date is now locked for this user.",
-      });
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : "Unable to save join date.";
-      toast.push({ title: "Join date blocked", description: message });
-    } finally {
-      setSettingJoinDate(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div>
@@ -750,11 +741,11 @@ export function AdminUsersTab() {
         <table className="min-w-full text-left text-sm">
           <thead className="bg-muted text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Email</th>
-              <th className="px-3 py-2 font-medium">Access</th>
+              <th className="px-3 py-2 font-medium">User</th>
               <th className="px-3 py-2 font-medium">Role</th>
               <th className="px-3 py-2 font-medium">Team</th>
+              <th className="px-3 py-2 font-medium">Join Date</th>
+              <th className="px-3 py-2 font-medium">Entitlement</th>
               <th className="px-3 py-2 font-medium">Actions</th>
             </tr>
           </thead>
@@ -767,6 +758,18 @@ export function AdminUsersTab() {
                 teamOptions={teamOptions}
                 users={users}
                 onSave={userRepository.updateUserAdmin}
+                onSaveJoinDate={async (input) => {
+                  await setJoinDate(
+                    { userRepository },
+                    { uid: input.uid, joinDate: input.joinDate, currentJoinDate: null }
+                  );
+                }}
+                onSaveEntitlement={async (input) => {
+                  await userRepository.updateUserEntitlement(input);
+                }}
+                onSaveComplete={() => {
+                  toast.push({ title: "Saved", description: "User info updated successfully." });
+                }}
                 actorUid={adminUser.uid}
                 fetchPendingRequests={leaveRequestRepository.fetchUserRequests}
                 fetchTeamPendingRequests={
@@ -804,7 +807,7 @@ export function AdminUsersTab() {
               ) : null}
               {hasStaleBalance ? (
                 <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                  Warning: This user has balances older than two years.
+                  Warning: This user has old balances (2+ years) that were not carried over.
                 </div>
               ) : null}
               <div className="rounded-xl border bg-card/60 p-4 text-sm">
@@ -815,14 +818,16 @@ export function AdminUsersTab() {
                       Choose the leave type and year you want to adjust.
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleCarryover}
-                    disabled={carrying || joinDateMissing}
-                  >
-                    {carrying ? "Carrying..." : `Carry from ${balanceYear - 1}`}
-                  </Button>
+                  {balanceType === "annual" ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleCarryover}
+                      disabled={carrying || joinDateMissing}
+                    >
+                      {carrying ? "Carrying..." : `Carry from ${balanceYear - 1}`}
+                    </Button>
+                  ) : null}
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1">
@@ -846,43 +851,9 @@ export function AdminUsersTab() {
                     <Input
                       type="number"
                       value={balanceYear}
-                      onChange={(event) =>
-                        setBalanceYear((current) => {
-                          const nextYear = Number.parseInt(
-                            event.target.value,
-                            10
-                          );
-                          return Number.isNaN(nextYear) ? current : nextYear;
-                        })
-                      }
+                      readOnly
                     />
                   </label>
-                </div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                  <label className="flex flex-col gap-1 text-sm">
-                    Join date
-                    {balanceUser.joinDate ? (
-                      <Input value={joinDateLabel} readOnly />
-                    ) : (
-                      <Input
-                        type="date"
-                        value={joinDateDraft}
-                        onChange={(event) => setJoinDateDraft(event.target.value)}
-                      />
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      Join date is permanent once saved.
-                    </span>
-                  </label>
-                  {!balanceUser.joinDate ? (
-                    <Button
-                      size="sm"
-                      onClick={handleSetJoinDate}
-                      disabled={settingJoinDate}
-                    >
-                      {settingJoinDate ? "Saving..." : "Set join date"}
-                    </Button>
-                  ) : null}
                 </div>
                 <div className="mt-3 flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2">
                   <span className="text-muted-foreground">Current balance</span>
