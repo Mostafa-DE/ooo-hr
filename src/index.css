@@ -49,4 +49,16 @@
     @apply bg-background text-foreground;
     min-height: 100vh;
   }
+
+  button,
+  a,
+  [role="button"],
+  [role="tab"],
+  [type="checkbox"],
+  [type="radio"],
+  select,
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
 }

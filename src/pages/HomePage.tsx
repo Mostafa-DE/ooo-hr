@@ -33,33 +33,32 @@ export function HomePage() {
     return formatDurationWithDays(minutes);
   };
 
-  return (
-    <div className="space-y-4">
-      {user && !showAdminWidget ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Balances {currentYear}
+  const balanceStrip = user && !showAdminWidget ? (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span className="text-xs font-medium text-muted-foreground">Your balance ({currentYear})</span>
+      {leaveTypes.map((leaveType) => (
+        <div
+          key={leaveType}
+          className="inline-flex items-center overflow-hidden rounded-md border text-xs"
+        >
+          <span className="bg-muted px-1.5 py-0.5 font-medium capitalize text-muted-foreground">
+            {leaveType.replace("_", " ")}
           </span>
-          {leaveTypes.map((leaveType) => (
-            <div
-              key={leaveType}
-              className="inline-flex items-center overflow-hidden rounded-md border text-sm"
-            >
-              <span className="bg-muted px-2 py-1 text-xs font-medium capitalize text-muted-foreground">
-                {leaveType.replace("_", " ")}
-              </span>
-              <span className="px-2 py-1 font-semibold tabular-nums">
-                {formatBalance(balancesByType.get(leaveType))}
-              </span>
-            </div>
-          ))}
+          <span className="px-1.5 py-0.5 font-semibold tabular-nums">
+            {formatBalance(balancesByType.get(leaveType))}
+          </span>
         </div>
-      ) : null}
+      ))}
+    </div>
+  ) : null;
+
+  return (
+    <div>
       {showAdminWidget ? (
         <TeamCalendarWidget teamId={null} includeAllTeams />
       ) : null}
       {showTeamWidget && profile?.teamId ? (
-        <TeamCalendarWidget teamId={profile.teamId} />
+        <TeamCalendarWidget teamId={profile.teamId} headerExtra={balanceStrip} />
       ) : null}
     </div>
   );

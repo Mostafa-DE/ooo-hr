@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 
 import { useAuth } from '@/auth/useAuth'
 import { LoadingState } from '@/components/LoadingState'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { useLeaveBalanceAdjustments } from '@/hooks/useLeaveBalanceAdjustments'
 import { formatDateTime, formatDurationWithDays } from '@/lib/leave'
@@ -99,25 +100,21 @@ export function BalanceAdjustmentsPage() {
   }
 
   return (
-    <section className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">My Balances</h1>
-        <p className="text-sm text-muted-foreground">
-          View your leave balance history and adjustments.
-        </p>
-      </div>
+    <section className="space-y-3">
+      <h1 className="text-lg font-semibold tracking-tight">My Balances</h1>
 
-      <div className="rounded-lg border bg-card p-4 text-card-foreground">
+      <div>
         {/* Filters */}
         {adjustments.length > 0 && (
-          <div className="mb-4 space-y-3">
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
             {/* Year filter */}
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-muted-foreground">Year</div>
-              <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Year</span>
+              <div className="flex gap-1">
                 <Button
                   variant={filterYear === 'all' ? 'default' : 'outline'}
                   size="sm"
+                  className="h-7 px-2 text-xs"
                   onClick={() => setFilterYear('all')}
                 >
                   All
@@ -127,6 +124,7 @@ export function BalanceAdjustmentsPage() {
                     key={year}
                     variant={filterYear === year ? 'default' : 'outline'}
                     size="sm"
+                    className="h-7 px-2 text-xs"
                     onClick={() => setFilterYear(year)}
                   >
                     {year}
@@ -136,12 +134,13 @@ export function BalanceAdjustmentsPage() {
             </div>
 
             {/* Source filter */}
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-muted-foreground">Source</div>
-              <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Source</span>
+              <div className="flex gap-1">
                 <Button
                   variant={filterSource === 'all' ? 'default' : 'outline'}
                   size="sm"
+                  className="h-7 px-2 text-xs"
                   onClick={() => setFilterSource('all')}
                 >
                   All
@@ -149,6 +148,7 @@ export function BalanceAdjustmentsPage() {
                 <Button
                   variant={filterSource === 'admin' ? 'default' : 'outline'}
                   size="sm"
+                  className="h-7 px-2 text-xs"
                   onClick={() => setFilterSource('admin')}
                 >
                   Admin
@@ -156,6 +156,7 @@ export function BalanceAdjustmentsPage() {
                 <Button
                   variant={filterSource === 'system' ? 'default' : 'outline'}
                   size="sm"
+                  className="h-7 px-2 text-xs"
                   onClick={() => setFilterSource('system')}
                 >
                   System
@@ -165,12 +166,13 @@ export function BalanceAdjustmentsPage() {
 
             {/* Leave type filter */}
             {availableLeaveTypes.length > 1 && (
-              <div className="space-y-1.5">
-                <div className="text-xs font-medium text-muted-foreground">Leave type</div>
-                <div className="flex flex-wrap gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Type</span>
+                <div className="flex gap-1">
                   <Button
                     variant={filterLeaveType === 'all' ? 'default' : 'outline'}
                     size="sm"
+                    className="h-7 px-2 text-xs"
                     onClick={() => setFilterLeaveType('all')}
                   >
                     All
@@ -180,6 +182,7 @@ export function BalanceAdjustmentsPage() {
                       key={type}
                       variant={filterLeaveType === type ? 'default' : 'outline'}
                       size="sm"
+                      className="h-7 px-2 text-xs"
                       onClick={() => setFilterLeaveType(type)}
                     >
                       {formatLeaveTypeLabel(type)}
@@ -199,20 +202,39 @@ export function BalanceAdjustmentsPage() {
                 : 'No adjustments match the selected filters.'}
             </p>
           ) : (
-            <div className="space-y-3">
-              {groupedAdjustments.map((group) => (
-                <div key={group.leaveType} className="rounded-md border bg-muted/20 p-3">
-                  <div className="text-sm font-semibold">
-                    {formatLeaveTypeLabel(group.leaveType)} ·{' '}
-                    {group.years.reduce((sum, yearGroup) => sum + yearGroup.items.length, 0)}
-                  </div>
-                  <div className="mt-3 space-y-4">
-                    {group.years.map((yearGroup) => (
-                      <div key={`${group.leaveType}-${yearGroup.year}`}>
-                        <div className="text-xs font-semibold text-muted-foreground">
-                          Year {yearGroup.year}
+            <Accordion type="multiple" className="space-y-3">
+              {groupedAdjustments.map((group) =>
+                group.years.map((yearGroup) => {
+                  const key = `${group.leaveType}-${yearGroup.year}`
+                  const totalDelta = yearGroup.items.reduce(
+                    (sum, adj) => sum + adj.deltaMinutes,
+                    0,
+                  )
+                  return (
+                    <AccordionItem
+                      key={key}
+                      value={key}
+                      className="rounded-md border bg-muted/20 px-3"
+                    >
+                      <AccordionTrigger>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">
+                            {formatLeaveTypeLabel(group.leaveType)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {yearGroup.year}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            · {yearGroup.items.length} adjustment
+                            {yearGroup.items.length !== 1 ? 's' : ''}
+                          </span>
+                          <span className="text-xs font-semibold">
+                            {formatAdjustmentDelta(totalDelta)}
+                          </span>
                         </div>
-                        <div className="mt-2 space-y-3">
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-2">
                           {yearGroup.items.map((adjustment) => (
                             <div
                               key={adjustment.id}
@@ -233,12 +255,12 @@ export function BalanceAdjustmentsPage() {
                             </div>
                           ))}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )
+                }),
+              )}
+            </Accordion>
           )}
         </div>
       </div>

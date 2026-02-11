@@ -142,82 +142,79 @@ export function MyRequestsPage() {
   }
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">My Requests</h1>
-        <p className="text-muted-foreground">
-          Track your submitted leave requests and their status.
-        </p>
-      </div>
+    <section className="space-y-3">
+      <h1 className="text-lg font-semibold tracking-tight">My Requests</h1>
 
       {/* Filters for requests table */}
       {requests.length > 0 && (availableStatuses.length > 1 || availableRequestTypes.length > 1) && (
-        <div className="rounded-lg border bg-card p-4">
-          <div className="space-y-3">
-            {/* Status filter */}
-            {availableStatuses.length > 1 && (
-              <div className="space-y-1.5">
-                <div className="text-xs font-medium text-muted-foreground">Status</div>
-                <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* Status filter */}
+          {availableStatuses.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Status</span>
+              <div className="flex gap-1">
+                <Button
+                  variant={requestFilterStatus === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    setRequestFilterStatus('all')
+                    setCurrentPage(1)
+                  }}
+                >
+                  All
+                </Button>
+                {availableStatuses.map((status) => (
                   <Button
-                    variant={requestFilterStatus === 'all' ? 'default' : 'outline'}
+                    key={status}
+                    variant={requestFilterStatus === status ? 'default' : 'outline'}
                     size="sm"
+                    className="h-7 px-2 text-xs"
                     onClick={() => {
-                      setRequestFilterStatus('all')
+                      setRequestFilterStatus(status)
                       setCurrentPage(1)
                     }}
                   >
-                    All
+                    {statusLabels[status] ?? status}
                   </Button>
-                  {availableStatuses.map((status) => (
-                    <Button
-                      key={status}
-                      variant={requestFilterStatus === status ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        setRequestFilterStatus(status)
-                        setCurrentPage(1)
-                      }}
-                    >
-                      {statusLabels[status] ?? status}
-                    </Button>
-                  ))}
-                </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Type filter */}
-            {availableRequestTypes.length > 1 && (
-              <div className="space-y-1.5">
-                <div className="text-xs font-medium text-muted-foreground">Type</div>
-                <div className="flex flex-wrap gap-2">
+          {/* Type filter */}
+          {availableRequestTypes.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Type</span>
+              <div className="flex gap-1">
+                <Button
+                  variant={requestFilterType === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    setRequestFilterType('all')
+                    setCurrentPage(1)
+                  }}
+                >
+                  All
+                </Button>
+                {availableRequestTypes.map((type) => (
                   <Button
-                    variant={requestFilterType === 'all' ? 'default' : 'outline'}
+                    key={type}
+                    variant={requestFilterType === type ? 'default' : 'outline'}
                     size="sm"
+                    className="h-7 px-2 text-xs"
                     onClick={() => {
-                      setRequestFilterType('all')
+                      setRequestFilterType(type)
                       setCurrentPage(1)
                     }}
                   >
-                    All
+                    {type.replace('_', ' ')}
                   </Button>
-                  {availableRequestTypes.map((type) => (
-                    <Button
-                      key={type}
-                      variant={requestFilterType === type ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        setRequestFilterType(type)
-                        setCurrentPage(1)
-                      }}
-                    >
-                      {type.replace('_', ' ')}
-                    </Button>
-                  ))}
-                </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

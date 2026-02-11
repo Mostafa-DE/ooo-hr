@@ -34,11 +34,13 @@ const leaveTypeLabels: Record<LeaveType, string> = {
 type TeamCalendarWidgetProps = {
   teamId: string | null;
   includeAllTeams?: boolean;
+  headerExtra?: ReactNode;
 };
 
 export function TeamCalendarWidget({
   teamId,
   includeAllTeams = false,
+  headerExtra,
 }: TeamCalendarWidgetProps) {
   const { requests, usersById, loading, error } = useTeamCalendar(
     teamId,
@@ -91,6 +93,7 @@ export function TeamCalendarWidget({
             <Badge variant="secondary">All teams</Badge>
           ) : null}
         </div>
+        {headerExtra}
       </div>
       <Tabs defaultValue="week" className="mt-4">
         <TabsList>
