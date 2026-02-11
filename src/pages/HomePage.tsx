@@ -34,40 +34,25 @@ export function HomePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold tracking-tight">Home</h1>
-          <p className="text-sm text-muted-foreground">
-            Team visibility for approved leave requests.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4">
       {user && !showAdminWidget ? (
-        <div className="rounded-xl border bg-card p-6 text-card-foreground">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">
-              Balance overview ({currentYear})
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Minutes shown as days/hours.
-            </p>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {leaveTypes.map((leaveType) => (
-              <div
-                key={leaveType}
-                className="rounded-lg border bg-muted/20 p-3 text-sm"
-              >
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  {leaveType.replace("_", " ")}
-                </div>
-                <div className="mt-1 font-semibold">
-                  {formatBalance(balancesByType.get(leaveType))}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Balances {currentYear}
+          </span>
+          {leaveTypes.map((leaveType) => (
+            <div
+              key={leaveType}
+              className="inline-flex items-center overflow-hidden rounded-md border text-sm"
+            >
+              <span className="bg-muted px-2 py-1 text-xs font-medium capitalize text-muted-foreground">
+                {leaveType.replace("_", " ")}
+              </span>
+              <span className="px-2 py-1 font-semibold tabular-nums">
+                {formatBalance(balancesByType.get(leaveType))}
+              </span>
+            </div>
+          ))}
         </div>
       ) : null}
       {showAdminWidget ? (
